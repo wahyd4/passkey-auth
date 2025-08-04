@@ -28,7 +28,11 @@ FROM alpine:latest
 # Install ca-certificates for HTTPS (no sqlite library needed)
 RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+# Create a non-root user with UID 1000
+RUN adduser -D -u 1000 -g 1000 -s /bin/sh appuser
+
+# Set working directory
+WORKDIR /app
 
 # Copy the binary from builder stage
 COPY --from=builder /app/passkey-auth .
@@ -39,8 +43,11 @@ COPY --from=builder /app/web ./web/
 # Copy default config
 COPY --from=builder /app/config.yaml .
 
-# Create directory for database
-RUN mkdir -p /data
+# Create directory for database and set ownership
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8080
