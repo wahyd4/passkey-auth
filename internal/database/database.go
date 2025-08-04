@@ -31,7 +31,7 @@ type Credential struct {
 }
 
 func New(dbPath string) (*DB, error) {
-	conn, err := sql.Open("sqlite3", dbPath+"?_fk=1")
+	conn, err := sql.Open("sqlite", dbPath+"?_fk=1")
 	if err != nil {
 		return nil, err
 	}
