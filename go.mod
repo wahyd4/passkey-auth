@@ -1,6 +1,6 @@
 module passkey-auth
 
-go 1.21
+go 1.23.0
 
 require (
 	github.com/go-webauthn/webauthn v0.10.2
@@ -21,6 +21,6 @@ require (
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 )
