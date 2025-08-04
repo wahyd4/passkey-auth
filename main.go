@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 
 	"passkey-auth/internal/auth"
 	"passkey-auth/internal/config"
+	"passkey-auth/internal/cors"
 	"passkey-auth/internal/database"
 	"passkey-auth/internal/handlers"
 )
@@ -74,15 +74,15 @@ func main() {
 	// Static files for admin UI
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/"))).Methods("GET")
 
-	// Setup CORS
-	c := cors.New(cors.Options{
+	// Setup CORS with wildcard support
+	corsHandler := cors.WildcardCORS(cors.Config{
 		AllowedOrigins:   cfg.CORS.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
 
-	handler := c.Handler(router)
+	handler := corsHandler(router)
 
 	// Start server
 	port := os.Getenv("PORT")

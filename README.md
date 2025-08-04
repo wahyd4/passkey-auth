@@ -70,6 +70,8 @@ webauthn:
 cors:
   allowed_origins:
     - "https://your-domain.com"       # Your domain with protocol
+    # Wildcard domains are supported for subdomains:
+    - "*.your-domain.com"             # Matches api.your-domain.com, app.your-domain.com, etc.
 
 auth:
   session_secret: "your-secure-secret-key"  # Generate a secure random string

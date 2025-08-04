@@ -76,7 +76,7 @@
                 justify-content: center;
                 margin-top: 1rem;
             }
-            
+
             .grid {
                 grid-template-columns: 1fr;
                 text-align: center;
@@ -117,18 +117,18 @@
                     <h2 id="authTitle">Sign in to your account</h2>
                     <p>Use your passkey for secure authentication</p>
                 </header>
-                
+
                 <form id="authForm">
                     <label for="email">
                         Email address
                         <input type="email" id="email" name="email" placeholder="Enter your email address" required>
                     </label>
-                    
+
                     <button type="submit" id="authSubmitBtn">
                         Sign in with passkey
                     </button>
                 </form>
-                
+
                 <footer class="auth-toggle">
                     <button type="button" class="link-btn" id="toggleModeBtn">
                         Don't have an account? Create one
@@ -144,9 +144,9 @@
                     <h2>Welcome back!</h2>
                     <p>You're successfully authenticated</p>
                 </header>
-                
+
                 <div id="welcomeMessage"></div>
-                
+
                 <footer>
                     <button type="button" class="secondary" id="logoutBtn">
                         Sign out
@@ -162,11 +162,11 @@
                     <h3>User Management</h3>
                     <p>Manage user accounts and permissions</p>
                 </header>
-                
+
                 <button onclick="loadUsers()" class="outline">
                     Refresh users
                 </button>
-                
+
                 <div id="usersList" class="users-list">
                     <article aria-busy="true">Loading users...</article>
                 </div>
@@ -409,11 +409,11 @@
             document.getElementById('authPanel').style.display = 'none';
             document.getElementById('welcomePanel').style.display = 'block';
             document.getElementById('headerSubtitle').textContent = 'Dashboard';
-            
+
             const welcomeMessage = document.getElementById('welcomeMessage');
             welcomeMessage.innerHTML = `
                 <p>Hello, <strong>${user.display_name}</strong>! You're successfully authenticated and ready to go.</p>
-                
+
                 <details>
                     <summary>Account Information</summary>
                     <table>
@@ -487,7 +487,7 @@
         function showAlert(message, type = 'success') {
             const alertsContainer = document.getElementById('alerts');
             const alert = document.createElement('article');
-            
+
             // Use appropriate styling based on type
             if (type === 'success') {
                 alert.style.borderLeftColor = 'var(--pico-ins-color)';
@@ -500,7 +500,7 @@
                 alert.style.borderLeftStyle = 'solid';
                 alert.innerHTML = `<strong>Error:</strong> ${message}`;
             }
-            
+
             alertsContainer.appendChild(alert);
 
             setTimeout(() => {
@@ -553,12 +553,12 @@
             console.log('hideUsersTab called');
             const usersTab = document.getElementById('usersTab');
             const usersContent = document.getElementById('users');
-            
+
             if (usersTab) {
                 usersTab.style.display = 'none';
                 console.log('Users tab is now hidden');
             }
-            
+
             // If users tab is currently active, switch to register tab
             if (usersContent && usersContent.classList.contains('active')) {
                 console.log('Users tab was active, switching to register tab');
@@ -570,13 +570,13 @@
 
             const email = document.getElementById('email').value;
             const submitBtn = document.getElementById('authSubmitBtn');
-            
+
             // Disable submit button during processing
             submitBtn.disabled = true;
             submitBtn.setAttribute('aria-busy', 'true');
             const originalText = submitBtn.textContent;
-            submitBtn.textContent = isSignUpMode ? 
-                'Creating account...' : 
+            submitBtn.textContent = isSignUpMode ?
+                'Creating account...' :
                 'Signing in...';
 
             try {
@@ -652,12 +652,12 @@
             }
 
             showAlert('Account created successfully! Welcome to the platform.');
-            
+
             // Check auth status to show welcome panel
             setTimeout(checkAuthStatus, 100);
         }
 
-        // Sign In Handler  
+        // Sign In Handler
         async function handleSignIn(email) {
             // Begin login
             const beginResponse = await fetch('/api/login/begin', {
@@ -704,7 +704,7 @@
 
             const result = await finishResponse.json();
             showAlert(`Welcome back, ${result.user.display_name}!`);
-            
+
             // Check auth status to show welcome panel
             setTimeout(checkAuthStatus, 100);
         }
@@ -718,14 +718,14 @@
                 const response = await fetch('/api/users', {
                     credentials: 'include'
                 });
-                
+
                 if (response.status === 403) {
                     // User is not admin, hide the tab
                     hideUsersTab();
                     showAlert('Access denied: Administrator privileges required', 'error');
                     return;
                 }
-                
+
                 if (!response.ok) {
                     throw new Error('Failed to load users');
                 }
@@ -743,9 +743,9 @@
                             <h4>${user.display_name}</h4>
                             <p>${user.email}</p>
                         </header>
-                        
+
                         <p><small>Created: ${new Date(user.created_at).toLocaleDateString()}</small></p>
-                        
+
                         <footer class="user-actions">
                             <span class="status-badge ${user.approved ? 'status-approved' : 'status-pending'}">
                                 ${user.approved ? 'Approved' : 'Pending Approval'}
@@ -814,7 +814,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // Load theme first
             loadTheme();
-            
+
             // Check authentication status to determine initial UI state
             await checkAuthStatus();
         });
