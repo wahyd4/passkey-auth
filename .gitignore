@@ -56,3 +56,5 @@ k8s/*-secret.yaml
 
 # Development files
 dev-*
+
+*.log

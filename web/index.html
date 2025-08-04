@@ -1,263 +1,195 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Passkey Auth - Admin</title>
+    <meta name="color-scheme" content="light dark">
+    <title>Passkey Authentication</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            padding: 2rem;
-            width: 100%;
-            max-width: 800px;
-            margin: 1rem;
-        }
-
-        .header {
+        /* Minimal custom styles - let PicoCSS handle most styling */
+        .auth-toggle {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-top: 1rem;
         }
 
-        .header h1 {
-            color: #333;
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .header p {
-            color: #666;
-            font-size: 1rem;
-        }
-
-        .tabs {
-            display: flex;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #eee;
-        }
-
-        .tab {
+        .link-btn {
             background: none;
             border: none;
-            padding: 1rem 2rem;
+            color: var(--pico-primary);
             cursor: pointer;
-            font-size: 1rem;
-            color: #666;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #333;
-            font-weight: 500;
-        }
-
-        input[type="text"], input[type="email"] {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #eee;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-        }
-
-        input[type="text"]:focus, input[type="email"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 2rem;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-        }
-
-        .users-list {
-            margin-top: 2rem;
-        }
-
-        .user-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            border: 1px solid #eee;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .user-info {
-            flex-grow: 1;
-        }
-
-        .user-info h3 {
-            color: #333;
-            margin-bottom: 0.25rem;
-        }
-
-        .user-info p {
-            color: #666;
+            text-decoration: underline;
             font-size: 0.9rem;
+            padding: 0;
+        }
+
+        .link-btn:hover {
+            opacity: 0.8;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--pico-border-radius);
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .status-approved {
+            background-color: var(--pico-ins-color);
+            color: var(--pico-ins-inverse);
+        }
+
+        .status-pending {
+            background-color: var(--pico-del-color);
+            color: var(--pico-del-inverse);
         }
 
         .user-actions {
             display: flex;
-            align-items: center;
             gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
-        .status-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            font-weight: 500;
-            margin-right: 1rem;
+        /* Hide panels by default */
+        .welcome-panel, .admin-panel {
+            display: none;
         }
 
-        .status-approved {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .alert {
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .loading {
+        /* Better spacing for main header */
+        body > main > header {
             text-align: center;
-            padding: 2rem;
-            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        /* Improve form layout */
+        #authForm button[type="submit"] {
+            margin-top: 1rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 576px) {
+            .user-actions {
+                justify-content: center;
+                margin-top: 1rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🔐 Passkey Auth</h1>
-            <p>Admin Dashboard</p>
-        </div>
+    <main class="container">
+        <header>
+            <hgroup>
+                <h1>🔐 Passkey Authentication</h1>
+                <p id="headerSubtitle">Secure passwordless authentication</p>
+            </hgroup>
+            <nav>
+                <ul>
+                    <li></li>
+                </ul>
+                <ul>
+                    <li>
+                        <details class="dropdown">
+                            <summary>Theme</summary>
+                            <ul>
+                                <li><a href="#" onclick="setTheme('auto')">Auto</a></li>
+                                <li><a href="#" onclick="setTheme('light')">Light</a></li>
+                                <li><a href="#" onclick="setTheme('dark')">Dark</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                </ul>
+            </nav>
+        </header>
 
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('register')">Register User</button>
-            <button class="tab" onclick="showTab('login')">Test Login</button>
-            <button class="tab" onclick="showTab('users')">Manage Users</button>
-        </div>
+        <!-- Authentication Section -->
+        <section id="authPanel" class="auth-panel">
+            <article>
+                <header>
+                    <h2 id="authTitle">Sign in to your account</h2>
+                    <p>Use your passkey for secure authentication</p>
+                </header>
+                
+                <form id="authForm">
+                    <label for="email">
+                        Email address
+                        <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+                    </label>
+                    
+                    <button type="submit" id="authSubmitBtn">
+                        Sign in with passkey
+                    </button>
+                </form>
+                
+                <footer class="auth-toggle">
+                    <button type="button" class="link-btn" id="toggleModeBtn">
+                        Don't have an account? Create one
+                    </button>
+                </footer>
+            </article>
+        </section>
 
-        <!-- Register Tab -->
-        <div id="register" class="tab-content active">
-            <h2>Register New User</h2>
-            <form id="registerForm">
-                <div class="form-group">
-                    <label for="email">Email Address:</label>
-                    <input type="email" id="email" name="email" required>
+        <!-- Welcome Section -->
+        <section id="welcomePanel" class="welcome-panel">
+            <article>
+                <header>
+                    <h2>Welcome back!</h2>
+                    <p>You're successfully authenticated</p>
+                </header>
+                
+                <div id="welcomeMessage"></div>
+                
+                <footer>
+                    <button type="button" class="secondary" id="logoutBtn">
+                        Sign out
+                    </button>
+                </footer>
+            </article>
+        </section>
+
+        <!-- Admin Panel -->
+        <section id="adminPanel" class="admin-panel">
+            <article>
+                <header>
+                    <h3>User Management</h3>
+                    <p>Manage user accounts and permissions</p>
+                </header>
+                
+                <button onclick="loadUsers()" class="outline">
+                    Refresh users
+                </button>
+                
+                <div id="usersList" class="users-list">
+                    <article aria-busy="true">Loading users...</article>
                 </div>
-                <div class="form-group">
-                    <label for="displayName">Display Name:</label>
-                    <input type="text" id="displayName" name="displayName" required>
-                </div>
-                <button type="submit" class="btn">Register with Passkey</button>
-            </form>
-        </div>
+            </article>
+        </section>
 
-        <!-- Login Tab -->
-        <div id="login" class="tab-content">
-            <h2>Test Login</h2>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="loginEmail">Email Address:</label>
-                    <input type="email" id="loginEmail" name="email" required>
-                </div>
-                <button type="submit" class="btn">Login with Passkey</button>
-            </form>
-            <div id="loginStatus"></div>
-        </div>
-
-        <!-- Users Tab -->
-        <div id="users" class="tab-content">
-            <h2>Manage Users</h2>
-            <button class="btn" onclick="loadUsers()">Refresh Users</button>
-            <div id="usersList" class="users-list">
-                <div class="loading">Loading users...</div>
-            </div>
-        </div>
-
+        <!-- Alerts Container -->
         <div id="alerts"></div>
-    </div>
+    </main>
 
     <script>
+        // Theme management
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('pico-theme', theme);
+        }
+
+        // Load saved theme or use auto
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('pico-theme') || 'auto';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
         // Base64/Base64URL decoding functions for WebAuthn
         function base64ToArrayBuffer(base64) {
             if (!base64 || typeof base64 !== 'string') {
@@ -437,6 +369,10 @@
             return response;
         }
 
+        // UI State Management
+        let isSignUpMode = false;
+        let currentUser = null;
+
         // Tab functionality
         function showTab(tabName) {
             // Hide all tab contents
@@ -461,158 +397,335 @@
             }
         }
 
+        // UI State Functions
+        function showAuthPanel() {
+            document.getElementById('authPanel').style.display = 'block';
+            document.getElementById('welcomePanel').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('headerSubtitle').textContent = 'Secure passwordless authentication';
+        }
+
+        function showWelcomePanel(user) {
+            document.getElementById('authPanel').style.display = 'none';
+            document.getElementById('welcomePanel').style.display = 'block';
+            document.getElementById('headerSubtitle').textContent = 'Dashboard';
+            
+            const welcomeMessage = document.getElementById('welcomeMessage');
+            welcomeMessage.innerHTML = `
+                <p>Hello, <strong>${user.display_name}</strong>! You're successfully authenticated and ready to go.</p>
+                
+                <details>
+                    <summary>Account Information</summary>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td><strong>Name</strong></td>
+                                <td>${user.display_name}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Email</strong></td>
+                                <td>${user.email}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Role</strong></td>
+                                <td>${user.is_admin ? '<span class="status-badge status-approved">Administrator</span>' : '<span class="status-badge">User</span>'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
+            `;
+
+            // Show admin panel if user is admin
+            if (user.is_admin) {
+                document.getElementById('adminPanel').style.display = 'block';
+                loadUsers();
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+            }
+        }
+
+        function toggleSignUpMode() {
+            isSignUpMode = !isSignUpMode;
+            const authTitle = document.getElementById('authTitle');
+            const authSubmitBtn = document.getElementById('authSubmitBtn');
+            const toggleModeBtn = document.getElementById('toggleModeBtn');
+            const authDescription = document.querySelector('#authPanel article header p');
+
+            if (isSignUpMode) {
+                authTitle.textContent = 'Create your account';
+                authSubmitBtn.textContent = 'Create account with passkey';
+                toggleModeBtn.textContent = 'Already have an account? Sign in';
+                authDescription.textContent = 'Create a new account with secure passkey authentication';
+            } else {
+                authTitle.textContent = 'Sign in to your account';
+                authSubmitBtn.textContent = 'Sign in with passkey';
+                toggleModeBtn.textContent = "Don't have an account? Create one";
+                authDescription.textContent = 'Use your passkey for secure authentication';
+            }
+        }
+
+        function logout() {
+            fetch('/api/logout', {
+                method: 'POST',
+                credentials: 'include'
+            }).then(() => {
+                currentUser = null;
+                showAuthPanel();
+                showAlert('You have been signed out successfully');
+                // Clear email input
+                document.getElementById('email').value = '';
+            }).catch(error => {
+                showAlert('Sign out failed: ' + error.message, 'error');
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('toggleModeBtn').addEventListener('click', toggleSignUpMode);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
         // Alert functions
         function showAlert(message, type = 'success') {
             const alertsContainer = document.getElementById('alerts');
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = message;
+            const alert = document.createElement('article');
+            
+            // Use appropriate styling based on type
+            if (type === 'success') {
+                alert.style.borderLeftColor = 'var(--pico-ins-color)';
+                alert.style.borderLeftWidth = '4px';
+                alert.style.borderLeftStyle = 'solid';
+                alert.innerHTML = `<strong>Success:</strong> ${message}`;
+            } else {
+                alert.style.borderLeftColor = 'var(--pico-del-color)';
+                alert.style.borderLeftWidth = '4px';
+                alert.style.borderLeftStyle = 'solid';
+                alert.innerHTML = `<strong>Error:</strong> ${message}`;
+            }
+            
             alertsContainer.appendChild(alert);
 
             setTimeout(() => {
                 alert.remove();
             }, 5000);
-        }        // Register functionality
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        }
 
-            const formData = new FormData(e.target);
-            const email = formData.get('email');
-            const displayName = formData.get('displayName');
-
+        // Authentication status management
+        async function checkAuthStatus() {
             try {
-                console.log('Starting registration for email:', email);
-
-                // Begin registration
-                const beginResponse = await fetch('/api/register/begin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: email,
-                        display_name: displayName
-                    }),
+                console.log('Checking authentication status...');
+                const response = await fetch('/api/auth/status', {
                     credentials: 'include'
                 });
 
-                if (!beginResponse.ok) {
-                    throw new Error(await beginResponse.text());
+                console.log('Auth status response:', response.status, response.statusText);
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    console.log('User is authenticated:', userData);
+                    currentUser = userData.user;
+                    showWelcomePanel(userData.user);
+                    return userData;
+                } else {
+                    console.log('User is not authenticated');
+                    currentUser = null;
+                    showAuthPanel();
+                    return null;
                 }
-
-                const options = await beginResponse.json();
-                console.log('Raw options from server:', JSON.stringify(options, null, 2));
-
-                // Convert base64url encoded fields to ArrayBuffers
-                const webAuthnOptions = prepareWebAuthnOptions(options);
-                console.log('Final webAuthnOptions for navigator.credentials.create:', webAuthnOptions);
-
-                // Create credential
-                const credential = await navigator.credentials.create(webAuthnOptions);
-                console.log('Raw credential from navigator.credentials.create:', credential);
-
-                // Convert ArrayBuffers back to base64url for JSON
-                const credentialResponse = prepareWebAuthnResponse(credential);
-                console.log('Prepared credential response to send to server:', JSON.stringify(credentialResponse, null, 2));
-
-                // Finish registration
-                const finishResponse = await fetch('/api/register/finish', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(credentialResponse),
-                    credentials: 'include'
-                });
-
-                console.log('Finish registration response status:', finishResponse.status);
-                if (!finishResponse.ok) {
-                    const errorText = await finishResponse.text();
-                    console.error('Finish registration error:', errorText);
-                    throw new Error(errorText);
-                }
-
-                showAlert('User registered successfully!');
-                e.target.reset();
             } catch (error) {
-                showAlert(`Registration failed: ${error.message}`, 'error');
+                console.log('Auth status check failed:', error);
+                currentUser = null;
+                showAuthPanel();
+                return null;
             }
-        });        // Login functionality
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        }
+
+        function showUsersTab() {
+            console.log('showUsersTab called');
+            const usersTab = document.getElementById('usersTab');
+            if (usersTab) {
+                usersTab.style.display = 'block';
+                console.log('Users tab is now visible');
+            } else {
+                console.log('Could not find usersTab element');
+            }
+        }
+
+        function hideUsersTab() {
+            console.log('hideUsersTab called');
+            const usersTab = document.getElementById('usersTab');
+            const usersContent = document.getElementById('users');
+            
+            if (usersTab) {
+                usersTab.style.display = 'none';
+                console.log('Users tab is now hidden');
+            }
+            
+            // If users tab is currently active, switch to register tab
+            if (usersContent && usersContent.classList.contains('active')) {
+                console.log('Users tab was active, switching to register tab');
+                showTab('register');
+            }
+        }        // Unified Auth Form Handler
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const formData = new FormData(e.target);
-            const email = formData.get('email');
+            const email = document.getElementById('email').value;
+            const submitBtn = document.getElementById('authSubmitBtn');
+            
+            // Disable submit button during processing
+            submitBtn.disabled = true;
+            submitBtn.setAttribute('aria-busy', 'true');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = isSignUpMode ? 
+                'Creating account...' : 
+                'Signing in...';
 
             try {
-                // Begin login
-                const beginResponse = await fetch('/api/login/begin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: email
-                    }),
-                    credentials: 'include'
-                });
-
-                if (!beginResponse.ok) {
-                    throw new Error(await beginResponse.text());
+                if (isSignUpMode) {
+                    await handleSignUp(email);
+                } else {
+                    await handleSignIn(email);
                 }
-
-                const options = await beginResponse.json();
-                console.log('Raw login options from server:', JSON.stringify(options, null, 2));
-
-                // Convert base64url encoded fields to ArrayBuffers
-                const webAuthnOptions = prepareWebAuthnOptions(options);
-                console.log('Final login webAuthnOptions for navigator.credentials.get:', webAuthnOptions);
-
-                // Get credential
-                const credential = await navigator.credentials.get(webAuthnOptions);
-
-                // Convert ArrayBuffers back to base64url for JSON
-                const credentialResponse = prepareWebAuthnResponse(credential);
-
-                // Finish login
-                const finishResponse = await fetch('/api/login/finish', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(credentialResponse),
-                    credentials: 'include'
-                });
-
-                if (!finishResponse.ok) {
-                    throw new Error(await finishResponse.text());
-                }
-
-                const result = await finishResponse.json();
-                showAlert(`Login successful! Welcome, ${result.user.display_name}`);
-
-                document.getElementById('loginStatus').innerHTML = `
-                    <div class="alert alert-success">
-                        <strong>Logged in as:</strong> ${result.user.display_name} (${result.user.email})
-                    </div>
-                `;
             } catch (error) {
-                showAlert(`Login failed: ${error.message}`, 'error');
-                document.getElementById('loginStatus').innerHTML = `
-                    <div class="alert alert-error">
-                        Login failed: ${error.message}
-                    </div>
-                `;
+                showAlert(`${isSignUpMode ? 'Account creation' : 'Sign in'} failed: ${error.message}`, 'error');
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.removeAttribute('aria-busy');
+                submitBtn.textContent = originalText;
             }
         });
+
+        // Sign Up Handler
+        async function handleSignUp(email) {
+            console.log('Starting registration for email:', email);
+
+            // Use email as display name (extract name part before @)
+            const displayName = email.split('@')[0];
+
+            // Begin registration
+            const beginResponse = await fetch('/api/register/begin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    display_name: displayName
+                }),
+                credentials: 'include'
+            });
+
+            if (!beginResponse.ok) {
+                throw new Error(await beginResponse.text());
+            }
+
+            const options = await beginResponse.json();
+            console.log('Raw options from server:', JSON.stringify(options, null, 2));
+
+            // Convert base64url encoded fields to ArrayBuffers
+            const webAuthnOptions = prepareWebAuthnOptions(options);
+            console.log('Final webAuthnOptions for navigator.credentials.create:', webAuthnOptions);
+
+            // Create credential
+            const credential = await navigator.credentials.create(webAuthnOptions);
+            console.log('Raw credential from navigator.credentials.create:', credential);
+
+            // Convert ArrayBuffers back to base64url for JSON
+            const credentialResponse = prepareWebAuthnResponse(credential);
+            console.log('Prepared credential response to send to server:', JSON.stringify(credentialResponse, null, 2));
+
+            // Finish registration
+            const finishResponse = await fetch('/api/register/finish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentialResponse),
+                credentials: 'include'
+            });
+
+            console.log('Finish registration response status:', finishResponse.status);
+            if (!finishResponse.ok) {
+                const errorText = await finishResponse.text();
+                console.error('Finish registration error:', errorText);
+                throw new Error(errorText);
+            }
+
+            showAlert('Account created successfully! Welcome to the platform.');
+            
+            // Check auth status to show welcome panel
+            setTimeout(checkAuthStatus, 100);
+        }
+
+        // Sign In Handler  
+        async function handleSignIn(email) {
+            // Begin login
+            const beginResponse = await fetch('/api/login/begin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email
+                }),
+                credentials: 'include'
+            });
+
+            if (!beginResponse.ok) {
+                throw new Error(await beginResponse.text());
+            }
+
+            const options = await beginResponse.json();
+            console.log('Raw login options from server:', JSON.stringify(options, null, 2));
+
+            // Convert base64url encoded fields to ArrayBuffers
+            const webAuthnOptions = prepareWebAuthnOptions(options);
+            console.log('Final login webAuthnOptions for navigator.credentials.get:', webAuthnOptions);
+
+            // Get credential
+            const credential = await navigator.credentials.get(webAuthnOptions);
+
+            // Convert ArrayBuffers back to base64url for JSON
+            const credentialResponse = prepareWebAuthnResponse(credential);
+
+            // Finish login
+            const finishResponse = await fetch('/api/login/finish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentialResponse),
+                credentials: 'include'
+            });
+
+            if (!finishResponse.ok) {
+                throw new Error(await finishResponse.text());
+            }
+
+            const result = await finishResponse.json();
+            showAlert(`Welcome back, ${result.user.display_name}!`);
+            
+            // Check auth status to show welcome panel
+            setTimeout(checkAuthStatus, 100);
+        }
 
         // Users management
         async function loadUsers() {
             const usersList = document.getElementById('usersList');
-            usersList.innerHTML = '<div class="loading">Loading users...</div>';
+            usersList.innerHTML = '<article aria-busy="true">Loading users...</article>';
 
             try {
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/users', {
+                    credentials: 'include'
+                });
+                
+                if (response.status === 403) {
+                    // User is not admin, hide the tab
+                    hideUsersTab();
+                    showAlert('Access denied: Administrator privileges required', 'error');
+                    return;
+                }
+                
                 if (!response.ok) {
                     throw new Error('Failed to load users');
                 }
@@ -625,22 +738,25 @@
                 }
 
                 usersList.innerHTML = users.map(user => `
-                    <div class="user-item">
-                        <div class="user-info">
-                            <h3>${user.display_name}</h3>
-                            <p>${user.email} • Created: ${new Date(user.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <div class="user-actions">
+                    <article>
+                        <header>
+                            <h4>${user.display_name}</h4>
+                            <p>${user.email}</p>
+                        </header>
+                        
+                        <p><small>Created: ${new Date(user.created_at).toLocaleDateString()}</small></p>
+                        
+                        <footer class="user-actions">
                             <span class="status-badge ${user.approved ? 'status-approved' : 'status-pending'}">
-                                ${user.approved ? 'Approved' : 'Pending'}
+                                ${user.approved ? 'Approved' : 'Pending Approval'}
                             </span>
-                            ${!user.approved ? `<button class="btn" onclick="approveUser(${user.id})">Approve</button>` : ''}
-                            <button class="btn btn-danger" onclick="deleteUser(${user.id})">Delete</button>
-                        </div>
-                    </div>
+                            ${!user.approved ? `<button class="outline" onclick="approveUser(${user.id})">Approve User</button>` : ''}
+                            <button class="secondary" onclick="deleteUser(${user.id})">Delete User</button>
+                        </footer>
+                    </article>
                 `).join('');
             } catch (error) {
-                usersList.innerHTML = `<div class="alert alert-error">Failed to load users: ${error.message}</div>`;
+                usersList.innerHTML = `<article><mark>Failed to load users: ${error.message}</mark></article>`;
             }
         }
 
@@ -657,14 +773,15 @@
                     },
                     body: JSON.stringify({
                         approved: true
-                    })
+                    }),
+                    credentials: 'include'
                 });
 
                 if (!response.ok) {
                     throw new Error('Failed to approve user');
                 }
 
-                showAlert('User approved successfully', 'success');
+                showAlert('User approved successfully');
                 loadUsers(); // Refresh the users list
             } catch (error) {
                 showAlert(`Failed to approve user: ${error.message}`, 'error');
@@ -672,29 +789,34 @@
         }
 
         async function deleteUser(userId) {
-            if (!confirm('Are you sure you want to delete this user?')) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
                 return;
             }
 
             try {
                 const response = await fetch(`/api/users/${userId}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    credentials: 'include'
                 });
 
                 if (!response.ok) {
                     throw new Error('Failed to delete user');
                 }
 
-                showAlert('User deleted successfully!');
+                showAlert('User deleted successfully');
                 loadUsers();
             } catch (error) {
                 showAlert(`Failed to delete user: ${error.message}`, 'error');
             }
         }
 
-        // Load users when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            loadUsers();
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load theme first
+            loadTheme();
+            
+            // Check authentication status to determine initial UI state
+            await checkAuthStatus();
         });
     </script>
 </body>

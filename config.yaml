@@ -22,3 +22,5 @@ auth:
   allowed_emails:
     # - "admin@example.com"
     # - "user@example.com"
+  # Admin email - user with this email will be auto-approved and can access admin panel
+  admin_email: ""  # Set this to your admin email or use ADMIN_EMAIL environment variable

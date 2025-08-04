@@ -40,6 +40,7 @@ type AuthConfig struct {
 	SessionSecret   string   `yaml:"session_secret"`
 	RequireApproval bool     `yaml:"require_approval"`
 	AllowedEmails   []string `yaml:"allowed_emails"`
+	AdminEmail      string   `yaml:"admin_email"`
 }
 
 func Load() (*Config, error) {
@@ -113,6 +114,9 @@ func Load() (*Config, error) {
 			config.Auth.AllowedEmails[i] = strings.TrimSpace(email)
 		}
 	}
+	if adminEmail := os.Getenv("ADMIN_EMAIL"); adminEmail != "" {
+		config.Auth.AdminEmail = adminEmail
+	}
 
 	return config, nil
 }
@@ -133,6 +137,11 @@ func (c *Config) IsEmailAllowed(email string) bool {
 	}
 
 	return false
+}
+
+// IsAdmin checks if an email address is the admin email
+func (c *Config) IsAdmin(email string) bool {
+	return c.Auth.AdminEmail != "" && email == c.Auth.AdminEmail
 }
 
 // validateConfigPath ensures the config path is safe and doesn't allow path traversal

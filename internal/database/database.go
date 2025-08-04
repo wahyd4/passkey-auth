@@ -31,7 +31,7 @@ type Credential struct {
 }
 
 func New(dbPath string) (*DB, error) {
-	conn, err := sql.Open("sqlite3", dbPath+"?_fk=1")
+	conn, err := sql.Open("sqlite", dbPath+"?_fk=1")
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +85,23 @@ func (db *DB) CreateUser(email, displayName string) (*User, error) {
 	result, err := db.conn.Exec(
 		"INSERT INTO users (email, display_name) VALUES (?, ?)",
 		email, displayName,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetUser(int(id))
+}
+
+func (db *DB) CreateUserWithApproval(email, displayName string, approved bool) (*User, error) {
+	result, err := db.conn.Exec(
+		"INSERT INTO users (email, display_name, approved) VALUES (?, ?, ?)",
+		email, displayName, approved,
 	)
 	if err != nil {
 		return nil, err

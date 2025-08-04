@@ -53,6 +53,10 @@ auth:
     # - "user1@yourcompany.com"
     # - "user2@yourcompany.com"
 
+  # Admin email - user with this email will be auto-approved and can access admin panel
+  # Can also be set via ADMIN_EMAIL environment variable
+  admin_email: ""  # Set this to your admin email address
+
 # Environment-specific overrides can be set via environment variables:
 # - PORT: Server port
 # - HOST: Server host
@@ -60,3 +64,4 @@ auth:
 # - DATABASE_PATH: Database file path
 # - SESSION_SECRET: Session encryption secret
 # - ALLOWED_EMAILS: Comma-separated list of allowed emails
+# - ADMIN_EMAIL: Admin email address

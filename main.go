@@ -54,6 +54,7 @@ func main() {
 	api.HandleFunc("/login/begin", h.BeginLogin).Methods("POST")
 	api.HandleFunc("/login/finish", h.FinishLogin).Methods("POST")
 	api.HandleFunc("/logout", h.Logout).Methods("POST")
+	api.HandleFunc("/auth/status", h.GetAuthStatus).Methods("GET")
 	api.HandleFunc("/users", h.ListUsers).Methods("GET")
 	api.HandleFunc("/users", h.CreateUser).Methods("POST")
 	api.HandleFunc("/users/{id}", h.UpdateUser).Methods("PUT")
