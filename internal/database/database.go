@@ -98,6 +98,23 @@ func (db *DB) CreateUser(email, displayName string) (*User, error) {
 	return db.GetUser(int(id))
 }
 
+func (db *DB) CreateUserWithApproval(email, displayName string, approved bool) (*User, error) {
+	result, err := db.conn.Exec(
+		"INSERT INTO users (email, display_name, approved) VALUES (?, ?, ?)",
+		email, displayName, approved,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetUser(int(id))
+}
+
 func (db *DB) GetUser(id int) (*User, error) {
 	var user User
 	err := db.conn.QueryRow(

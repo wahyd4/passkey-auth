@@ -94,11 +94,16 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create new user
-	user, err := h.db.CreateUser(req.Email, req.DisplayName)
+	isAdmin := h.config.IsAdmin(req.Email)
+	user, err := h.db.CreateUserWithApproval(req.Email, req.DisplayName, isAdmin)
 	if err != nil {
 		logrus.Errorf("Failed to create user: %v", err)
 		h.writeError(w, "Failed to create user", http.StatusInternalServerError)
 		return
+	}
+
+	if isAdmin {
+		logrus.Infof("Admin user auto-approved: %s", req.Email)
 	}
 
 	webAuthnUser := &auth.WebAuthnUser{}
@@ -190,7 +195,17 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear session
+	// Set authenticated session after successful registration
+	authSession, _ := h.store.Get(r, "auth-session")
+	authSession.Values["authenticated"] = true
+	authSession.Values["user_id"] = user.ID
+	authSession.Values["user_email"] = user.Email
+	if err := authSession.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save auth session", http.StatusInternalServerError)
+		return
+	}
+
+	// Clear webauthn session
 	session.Values["challenge"] = nil
 	session.Values["user_id"] = nil
 	if err := session.Save(r, w); err != nil {
@@ -364,11 +379,55 @@ func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetAuthStatus returns the current authentication status
+func (h *Handlers) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		h.writeError(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	userEmail, ok := session.Values["user_email"].(string)
+	if !ok || userEmail == "" {
+		h.writeError(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Get user details from database
+	user, err := h.db.GetUserByEmail(userEmail)
+	if err != nil {
+		h.writeError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user is approved
+	if !user.Approved {
+		h.writeError(w, "User not approved", http.StatusForbidden)
+		return
+	}
+
+	response := map[string]interface{}{
+		"authenticated": true,
+		"user": map[string]interface{}{
+			"id":           user.ID,
+			"email":        user.Email,
+			"display_name": user.DisplayName,
+			"approved":     user.Approved,
+			"is_admin":     h.config.IsAdmin(user.Email),
+		},
+	}
+
+	h.writeJSON(w, response)
+}
+
 // Admin endpoints
 
 // ListUsers returns all users (admin endpoint)
 func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	
 	users, err := h.db.ListUsers()
 	if err != nil {
 		logrus.Errorf("Failed to list users: %v", err)
@@ -381,7 +440,10 @@ func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 // CreateUser creates a new user (admin endpoint)
 func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	
 	var req struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"display_name"`
@@ -399,7 +461,7 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.db.CreateUser(req.Email, req.DisplayName)
+	user, err := h.db.CreateUserWithApproval(req.Email, req.DisplayName, req.Approved)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			h.writeError(w, "User already exists", http.StatusConflict)
@@ -410,18 +472,15 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Approved {
-		if err := h.db.ApproveUser(user.ID); err != nil {
-			logrus.Errorf("Failed to approve user: %v", err)
-		}
-	}
-
 	h.writeJSON(w, user)
 }
 
 // UpdateUser updates a user (admin endpoint)
 func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok {
@@ -467,7 +526,10 @@ func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 // DeleteUser deletes a user (admin endpoint)
 func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok {
@@ -488,4 +550,26 @@ func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, map[string]string{"status": "success"})
+}
+
+func (h *Handlers) isAdmin(r *http.Request) bool {
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		return false
+	}
+
+	userEmail, ok := session.Values["user_email"].(string)
+	if !ok {
+		return false
+	}
+
+	return h.config.IsAdmin(userEmail)
+}
+
+func (h *Handlers) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	if !h.isAdmin(r) {
+		h.writeError(w, "Admin access required", http.StatusForbidden)
+		return false
+	}
+	return true
 }

@@ -76,6 +76,41 @@
             display: block;
         }
 
+        .auth-panel, .welcome-panel, .admin-panel {
+            margin-bottom: 2rem;
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .link-btn {
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.9rem;
+        }
+
+        .link-btn:hover {
+            color: #764ba2;
+        }
+
+        .welcome-panel {
+            text-align: center;
+        }
+
+        .welcome-actions {
+            margin-top: 1.5rem;
+        }
+
+        .admin-panel {
+            border-top: 1px solid #eee;
+            padding-top: 2rem;
+        }
+
         .form-group {
             margin-bottom: 1.5rem;
         }
@@ -207,46 +242,35 @@
     <div class="container">
         <div class="header">
             <h1>🔐 Passkey Auth</h1>
-            <p>Admin Dashboard</p>
+            <p id="headerSubtitle">Secure Authentication</p>
         </div>
 
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('register')">Register User</button>
-            <button class="tab" onclick="showTab('login')">Test Login</button>
-            <button class="tab" onclick="showTab('users')">Manage Users</button>
-        </div>
-
-        <!-- Register Tab -->
-        <div id="register" class="tab-content active">
-            <h2>Register New User</h2>
-            <form id="registerForm">
+        <!-- Initial Auth Panel -->
+        <div id="authPanel" class="auth-panel">
+            <h2 id="authTitle">Sign In</h2>
+            <form id="authForm">
                 <div class="form-group">
                     <label for="email">Email Address:</label>
                     <input type="email" id="email" name="email" required>
                 </div>
-                <div class="form-group">
-                    <label for="displayName">Display Name:</label>
-                    <input type="text" id="displayName" name="displayName" required>
-                </div>
-                <button type="submit" class="btn">Register with Passkey</button>
+                <button type="submit" class="btn" id="authSubmitBtn">Sign In with Passkey</button>
             </form>
+            <div class="auth-toggle">
+                <button type="button" class="link-btn" id="toggleModeBtn">Don't have an account? Sign up</button>
+            </div>
         </div>
 
-        <!-- Login Tab -->
-        <div id="login" class="tab-content">
-            <h2>Test Login</h2>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="loginEmail">Email Address:</label>
-                    <input type="email" id="loginEmail" name="email" required>
-                </div>
-                <button type="submit" class="btn">Login with Passkey</button>
-            </form>
-            <div id="loginStatus"></div>
+        <!-- Welcome Panel (shown after auth) -->
+        <div id="welcomePanel" class="welcome-panel" style="display: none;">
+            <h2>Welcome!</h2>
+            <div id="welcomeMessage"></div>
+            <div class="welcome-actions">
+                <button type="button" class="btn btn-danger" id="logoutBtn">Logout</button>
+            </div>
         </div>
 
-        <!-- Users Tab -->
-        <div id="users" class="tab-content">
+        <!-- Admin Panel (shown for admin users) -->
+        <div id="adminPanel" class="admin-panel" style="display: none;">
             <h2>Manage Users</h2>
             <button class="btn" onclick="loadUsers()">Refresh Users</button>
             <div id="usersList" class="users-list">
@@ -437,6 +461,10 @@
             return response;
         }
 
+        // UI State Management
+        let isSignUpMode = false;
+        let currentUser = null;
+
         // Tab functionality
         function showTab(tabName) {
             // Hide all tab contents
@@ -461,6 +489,72 @@
             }
         }
 
+        // UI State Functions
+        function showAuthPanel() {
+            document.getElementById('authPanel').style.display = 'block';
+            document.getElementById('welcomePanel').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('headerSubtitle').textContent = 'Secure Authentication';
+        }
+
+        function showWelcomePanel(user) {
+            document.getElementById('authPanel').style.display = 'none';
+            document.getElementById('welcomePanel').style.display = 'block';
+            document.getElementById('headerSubtitle').textContent = 'Dashboard';
+            
+            const welcomeMessage = document.getElementById('welcomeMessage');
+            welcomeMessage.innerHTML = `
+                <div class="alert alert-success">
+                    <strong>Welcome back, ${user.display_name}!</strong><br>
+                    <small>${user.email}</small>
+                </div>
+            `;
+
+            // Show admin panel if user is admin
+            if (user.is_admin) {
+                document.getElementById('adminPanel').style.display = 'block';
+                loadUsers();
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+            }
+        }
+
+        function toggleSignUpMode() {
+            isSignUpMode = !isSignUpMode;
+            const authTitle = document.getElementById('authTitle');
+            const authSubmitBtn = document.getElementById('authSubmitBtn');
+            const toggleModeBtn = document.getElementById('toggleModeBtn');
+
+            if (isSignUpMode) {
+                authTitle.textContent = 'Sign Up';
+                authSubmitBtn.textContent = 'Sign Up with Passkey';
+                toggleModeBtn.textContent = 'Already have an account? Sign in';
+            } else {
+                authTitle.textContent = 'Sign In';
+                authSubmitBtn.textContent = 'Sign In with Passkey';
+                toggleModeBtn.textContent = "Don't have an account? Sign up";
+            }
+        }
+
+        function logout() {
+            fetch('/api/logout', {
+                method: 'POST',
+                credentials: 'include'
+            }).then(() => {
+                currentUser = null;
+                showAuthPanel();
+                showAlert('Logged out successfully');
+                // Clear email input
+                document.getElementById('email').value = '';
+            }).catch(error => {
+                showAlert('Logout failed: ' + error.message, 'error');
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('toggleModeBtn').addEventListener('click', toggleSignUpMode);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
         // Alert functions
         function showAlert(message, type = 'success') {
             const alertsContainer = document.getElementById('alerts');
@@ -472,139 +566,204 @@
             setTimeout(() => {
                 alert.remove();
             }, 5000);
-        }        // Register functionality
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        }
 
-            const formData = new FormData(e.target);
-            const email = formData.get('email');
-            const displayName = formData.get('displayName');
-
+        // Authentication status management
+        async function checkAuthStatus() {
             try {
-                console.log('Starting registration for email:', email);
-
-                // Begin registration
-                const beginResponse = await fetch('/api/register/begin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: email,
-                        display_name: displayName
-                    }),
+                console.log('Checking authentication status...');
+                const response = await fetch('/api/auth/status', {
                     credentials: 'include'
                 });
 
-                if (!beginResponse.ok) {
-                    throw new Error(await beginResponse.text());
+                console.log('Auth status response:', response.status, response.statusText);
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    console.log('User is authenticated:', userData);
+                    currentUser = userData.user;
+                    showWelcomePanel(userData.user);
+                    return userData;
+                } else {
+                    console.log('User is not authenticated');
+                    currentUser = null;
+                    showAuthPanel();
+                    return null;
                 }
-
-                const options = await beginResponse.json();
-                console.log('Raw options from server:', JSON.stringify(options, null, 2));
-
-                // Convert base64url encoded fields to ArrayBuffers
-                const webAuthnOptions = prepareWebAuthnOptions(options);
-                console.log('Final webAuthnOptions for navigator.credentials.create:', webAuthnOptions);
-
-                // Create credential
-                const credential = await navigator.credentials.create(webAuthnOptions);
-                console.log('Raw credential from navigator.credentials.create:', credential);
-
-                // Convert ArrayBuffers back to base64url for JSON
-                const credentialResponse = prepareWebAuthnResponse(credential);
-                console.log('Prepared credential response to send to server:', JSON.stringify(credentialResponse, null, 2));
-
-                // Finish registration
-                const finishResponse = await fetch('/api/register/finish', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(credentialResponse),
-                    credentials: 'include'
-                });
-
-                console.log('Finish registration response status:', finishResponse.status);
-                if (!finishResponse.ok) {
-                    const errorText = await finishResponse.text();
-                    console.error('Finish registration error:', errorText);
-                    throw new Error(errorText);
-                }
-
-                showAlert('User registered successfully!');
-                e.target.reset();
             } catch (error) {
-                showAlert(`Registration failed: ${error.message}`, 'error');
+                console.log('Auth status check failed:', error);
+                currentUser = null;
+                showAuthPanel();
+                return null;
             }
-        });        // Login functionality
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        }
+
+        function showUsersTab() {
+            console.log('showUsersTab called');
+            const usersTab = document.getElementById('usersTab');
+            if (usersTab) {
+                usersTab.style.display = 'block';
+                console.log('Users tab is now visible');
+            } else {
+                console.log('Could not find usersTab element');
+            }
+        }
+
+        function hideUsersTab() {
+            console.log('hideUsersTab called');
+            const usersTab = document.getElementById('usersTab');
+            const usersContent = document.getElementById('users');
+            
+            if (usersTab) {
+                usersTab.style.display = 'none';
+                console.log('Users tab is now hidden');
+            }
+            
+            // If users tab is currently active, switch to register tab
+            if (usersContent && usersContent.classList.contains('active')) {
+                console.log('Users tab was active, switching to register tab');
+                showTab('register');
+            }
+        }        // Unified Auth Form Handler
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const formData = new FormData(e.target);
-            const email = formData.get('email');
+            const email = document.getElementById('email').value;
+            const submitBtn = document.getElementById('authSubmitBtn');
+            
+            // Disable submit button during processing
+            submitBtn.disabled = true;
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = isSignUpMode ? 'Signing up...' : 'Signing in...';
 
             try {
-                // Begin login
-                const beginResponse = await fetch('/api/login/begin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: email
-                    }),
-                    credentials: 'include'
-                });
-
-                if (!beginResponse.ok) {
-                    throw new Error(await beginResponse.text());
+                if (isSignUpMode) {
+                    await handleSignUp(email);
+                } else {
+                    await handleSignIn(email);
                 }
-
-                const options = await beginResponse.json();
-                console.log('Raw login options from server:', JSON.stringify(options, null, 2));
-
-                // Convert base64url encoded fields to ArrayBuffers
-                const webAuthnOptions = prepareWebAuthnOptions(options);
-                console.log('Final login webAuthnOptions for navigator.credentials.get:', webAuthnOptions);
-
-                // Get credential
-                const credential = await navigator.credentials.get(webAuthnOptions);
-
-                // Convert ArrayBuffers back to base64url for JSON
-                const credentialResponse = prepareWebAuthnResponse(credential);
-
-                // Finish login
-                const finishResponse = await fetch('/api/login/finish', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(credentialResponse),
-                    credentials: 'include'
-                });
-
-                if (!finishResponse.ok) {
-                    throw new Error(await finishResponse.text());
-                }
-
-                const result = await finishResponse.json();
-                showAlert(`Login successful! Welcome, ${result.user.display_name}`);
-
-                document.getElementById('loginStatus').innerHTML = `
-                    <div class="alert alert-success">
-                        <strong>Logged in as:</strong> ${result.user.display_name} (${result.user.email})
-                    </div>
-                `;
             } catch (error) {
-                showAlert(`Login failed: ${error.message}`, 'error');
-                document.getElementById('loginStatus').innerHTML = `
-                    <div class="alert alert-error">
-                        Login failed: ${error.message}
-                    </div>
-                `;
+                showAlert(`${isSignUpMode ? 'Sign up' : 'Sign in'} failed: ${error.message}`, 'error');
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
         });
+
+        // Sign Up Handler
+        async function handleSignUp(email) {
+            console.log('Starting registration for email:', email);
+
+            // Use email as display name (extract name part before @)
+            const displayName = email.split('@')[0];
+
+            // Begin registration
+            const beginResponse = await fetch('/api/register/begin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    display_name: displayName
+                }),
+                credentials: 'include'
+            });
+
+            if (!beginResponse.ok) {
+                throw new Error(await beginResponse.text());
+            }
+
+            const options = await beginResponse.json();
+            console.log('Raw options from server:', JSON.stringify(options, null, 2));
+
+            // Convert base64url encoded fields to ArrayBuffers
+            const webAuthnOptions = prepareWebAuthnOptions(options);
+            console.log('Final webAuthnOptions for navigator.credentials.create:', webAuthnOptions);
+
+            // Create credential
+            const credential = await navigator.credentials.create(webAuthnOptions);
+            console.log('Raw credential from navigator.credentials.create:', credential);
+
+            // Convert ArrayBuffers back to base64url for JSON
+            const credentialResponse = prepareWebAuthnResponse(credential);
+            console.log('Prepared credential response to send to server:', JSON.stringify(credentialResponse, null, 2));
+
+            // Finish registration
+            const finishResponse = await fetch('/api/register/finish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentialResponse),
+                credentials: 'include'
+            });
+
+            console.log('Finish registration response status:', finishResponse.status);
+            if (!finishResponse.ok) {
+                const errorText = await finishResponse.text();
+                console.error('Finish registration error:', errorText);
+                throw new Error(errorText);
+            }
+
+            showAlert('Account created successfully!');
+            
+            // Check auth status to show welcome panel
+            setTimeout(checkAuthStatus, 100);
+        }
+
+        // Sign In Handler  
+        async function handleSignIn(email) {
+            // Begin login
+            const beginResponse = await fetch('/api/login/begin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email
+                }),
+                credentials: 'include'
+            });
+
+            if (!beginResponse.ok) {
+                throw new Error(await beginResponse.text());
+            }
+
+            const options = await beginResponse.json();
+            console.log('Raw login options from server:', JSON.stringify(options, null, 2));
+
+            // Convert base64url encoded fields to ArrayBuffers
+            const webAuthnOptions = prepareWebAuthnOptions(options);
+            console.log('Final login webAuthnOptions for navigator.credentials.get:', webAuthnOptions);
+
+            // Get credential
+            const credential = await navigator.credentials.get(webAuthnOptions);
+
+            // Convert ArrayBuffers back to base64url for JSON
+            const credentialResponse = prepareWebAuthnResponse(credential);
+
+            // Finish login
+            const finishResponse = await fetch('/api/login/finish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentialResponse),
+                credentials: 'include'
+            });
+
+            if (!finishResponse.ok) {
+                throw new Error(await finishResponse.text());
+            }
+
+            const result = await finishResponse.json();
+            showAlert(`Welcome back, ${result.user.display_name}!`);
+            
+            // Check auth status to show welcome panel
+            setTimeout(checkAuthStatus, 100);
+        }
 
         // Users management
         async function loadUsers() {
@@ -612,7 +771,17 @@
             usersList.innerHTML = '<div class="loading">Loading users...</div>';
 
             try {
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/users', {
+                    credentials: 'include'
+                });
+                
+                if (response.status === 403) {
+                    // User is not admin, hide the tab
+                    hideUsersTab();
+                    showAlert('Access denied: Admin privileges required', 'error');
+                    return;
+                }
+                
                 if (!response.ok) {
                     throw new Error('Failed to load users');
                 }
@@ -692,9 +861,10 @@
             }
         }
 
-        // Load users when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            loadUsers();
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication status to determine initial UI state
+            await checkAuthStatus();
         });
     </script>
 </body>
