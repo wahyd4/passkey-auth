@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-bullseye AS builder
+FROM golang:1.23-bullseye AS builder
 
 # Install build dependencies including sqlite
 RUN apt-get update && apt-get install -y gcc libsqlite3-dev && rm -rf /var/lib/apt/lists/*
