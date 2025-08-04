@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,12 +48,19 @@ func New(db *database.DB, webAuthn *auth.WebAuthn, config *config.Config) *Handl
 func (h *Handlers) writeError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		// If we can't encode the error response, log it
+		// Don't try to write another response as headers are already sent
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func (h *Handlers) writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		// If encoding fails, try to send a simple error response
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // BeginRegistration starts the passkey registration process
@@ -107,7 +115,10 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	session, _ := h.store.Get(r, "webauthn-session")
 	session.Values["challenge"] = sessionData.Challenge
 	session.Values["user_id"] = user.ID
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
 
 	// Debug: log the options structure
 	logrus.Debugf("WebAuthn options: %+v", options)
@@ -182,7 +193,10 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	// Clear session
 	session.Values["challenge"] = nil
 	session.Values["user_id"] = nil
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session: %v", err)
+		// Don't return error here as the main operation succeeded
+	}
 
 	h.writeJSON(w, map[string]string{"status": "success"})
 }
@@ -233,7 +247,10 @@ func (h *Handlers) BeginLogin(w http.ResponseWriter, r *http.Request) {
 	session, _ := h.store.Get(r, "webauthn-session")
 	session.Values["challenge"] = sessionData.Challenge
 	session.Values["user_id"] = webAuthnUser.GetUser().ID
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
 
 	h.writeJSON(w, options)
 }
@@ -288,12 +305,18 @@ func (h *Handlers) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	authSession.Values["authenticated"] = true
 	authSession.Values["user_id"] = user.ID
 	authSession.Values["user_email"] = user.Email
-	authSession.Save(r, w)
+	if err := authSession.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save auth session", http.StatusInternalServerError)
+		return
+	}
 
 	// Clear webauthn session
 	session.Values["challenge"] = nil
 	session.Values["user_id"] = nil
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session: %v", err)
+		// Don't return error here as the main operation succeeded
+	}
 
 	h.writeJSON(w, map[string]interface{}{
 		"status": "success",
@@ -312,7 +335,10 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	session.Values["user_id"] = nil
 	session.Values["user_email"] = nil
 	session.Options.MaxAge = -1
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session during logout: %v", err)
+		// Don't return error here as logout should still succeed
+	}
 
 	h.writeJSON(w, map[string]string{"status": "success"})
 }

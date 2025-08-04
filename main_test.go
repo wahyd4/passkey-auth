@@ -16,7 +16,9 @@ func TestHealthEndpoint(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "healthy"}`))
+		if _, err := w.Write([]byte(`{"status": "healthy"}`)); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	})
 
 	handler.ServeHTTP(rr, req)

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -73,7 +72,7 @@ func Load() (*Config, error) {
 
 	// Load from file if it exists
 	if _, err := os.Stat(configPath); err == nil {
-		data, err := ioutil.ReadFile(configPath)
+		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return nil, err
 		}
