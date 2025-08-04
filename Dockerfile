@@ -1,22 +1,26 @@
 # Build stage
 FROM golang:1.23-alpine AS builder
 
-# Install git for Go modules (no need for gcc or sqlite-dev anymore)
+# Install git for Go modules
 RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
 
-# Download dependencies
+# Download dependencies (this will be cached if go.mod/go.sum don't change)
 RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Build the application with pure Go (no CGO needed)
-RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o passkey-auth .
+# Build the application with optimized flags and build cache
+# Remove -a flag to avoid rebuilding standard library
+# Remove unnecessary static linking flags since CGO is disabled
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o passkey-auth .
 
 # Final stage
 FROM alpine:latest
