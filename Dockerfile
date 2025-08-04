@@ -1,8 +1,8 @@
 # Build stage
-FROM golang:1.23-bullseye AS builder
+FROM golang:1.23-alpine AS builder
 
-# Install build dependencies including sqlite
-RUN apt-get update && apt-get install -y gcc libsqlite3-dev && rm -rf /var/lib/apt/lists/*
+# Install git for Go modules (no need for gcc or sqlite-dev anymore)
+RUN apk add --no-cache git
 
 WORKDIR /app
 
@@ -15,14 +15,14 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application (remove static linking for SQLite compatibility)
-RUN CGO_ENABLED=1 GOOS=linux go build -a -o passkey-auth .
+# Build the application with pure Go (no CGO needed)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o passkey-auth .
 
 # Final stage
-FROM debian:bullseye-slim
+FROM alpine:latest
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates libsqlite3-0 && rm -rf /var/lib/apt/lists/*
+# Install ca-certificates for HTTPS (no sqlite library needed)
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
