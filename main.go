@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
@@ -88,8 +89,17 @@ func main() {
 		port = "8080"
 	}
 
+	// Create server with proper timeouts to prevent resource exhaustion
+	server := &http.Server{
+		Addr:         ":" + port,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
 	logrus.Infof("Starting server on port %s", port)
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

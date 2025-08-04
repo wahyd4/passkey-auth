@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -46,6 +48,11 @@ func Load() (*Config, error) {
 		configPath = "config.yaml"
 	}
 
+	// Validate config path to prevent path traversal attacks
+	if err := validateConfigPath(configPath); err != nil {
+		return nil, fmt.Errorf("invalid config path: %w", err)
+	}
+
 	// Set defaults
 	config := &Config{
 		Server: ServerConfig{
@@ -72,6 +79,7 @@ func Load() (*Config, error) {
 
 	// Load from file if it exists
 	if _, err := os.Stat(configPath); err == nil {
+		// #nosec G304 - configPath is validated above to prevent path traversal
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return nil, err
@@ -125,4 +133,40 @@ func (c *Config) IsEmailAllowed(email string) bool {
 	}
 
 	return false
+}
+
+// validateConfigPath ensures the config path is safe and doesn't allow path traversal
+func validateConfigPath(path string) error {
+	// Clean the path and check for path traversal attempts
+	cleanPath := filepath.Clean(path)
+
+	// Don't allow paths that try to go up directories
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("path traversal not allowed")
+	}
+
+	// Only allow certain file extensions
+	ext := filepath.Ext(cleanPath)
+	if ext != ".yaml" && ext != ".yml" {
+		return fmt.Errorf("only .yaml and .yml files are allowed")
+	}
+
+	// Convert to absolute path to check if it's within allowed directories
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Get current working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Only allow config files in current directory or its subdirectories
+	if !strings.HasPrefix(absPath, wd) {
+		return fmt.Errorf("config file must be in current directory or subdirectories")
+	}
+
+	return nil
 }
