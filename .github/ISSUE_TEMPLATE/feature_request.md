@@ -12,18 +12,3 @@ A clear and concise description of what the problem is. Ex. I'm always frustrate
 
 **Describe the solution you'd like**
 A clear and concise description of what you want to happen.
-
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
-
-**Use case**
-Describe the specific use case this feature would address.
-
-**Implementation considerations**
-- Would this be backwards compatible?
-- Any security implications?
-- Database schema changes needed?
-- Configuration changes required?
-
-**Additional context**
-Add any other context, mockups, or examples about the feature request here.
