@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  passkey-auth:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - WEBAUTHN_RP_ID=localhost
+      - DATABASE_PATH=/data/passkey-auth.db
+      - SESSION_SECRET=dev-secret-change-in-production
+    volumes:
+      - ./data:/data
+      - ./config.yaml:/root/config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

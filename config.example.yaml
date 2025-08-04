@@ -1,0 +1,62 @@
+# Development Configuration
+# Copy this file to config.yaml and modify for your environment
+
+server:
+  port: "8080"
+  host: "0.0.0.0"
+
+webauthn:
+  # Display name shown during passkey registration
+  rp_display_name: "Passkey Auth - Development"
+
+  # Must match your domain exactly (without protocol)
+  # For local development, use "localhost"
+  # For production, use your actual domain like "auth.example.com"
+  rp_id: "localhost"
+
+  # List of allowed origins (with protocol)
+  # Must include all URLs where users will access the auth interface
+  rp_origins:
+    - "http://localhost:8080"
+    # Add your production URLs:
+    # - "https://auth.example.com"
+    # - "https://example.com"
+
+database:
+  # SQLite database file path
+  # In Kubernetes, this should be in a persistent volume
+  path: "passkey-auth.db"
+
+cors:
+  # Allowed origins for CORS
+  # In production, be specific about allowed origins for security
+  allowed_origins:
+    - "*"  # Only use "*" for development
+    # Production example:
+    # - "https://auth.example.com"
+    # - "https://admin.example.com"
+
+auth:
+  # Session encryption secret - MUST be changed in production!
+  # Generate with: openssl rand -base64 32
+  session_secret: "change-me-in-production"
+
+  # Whether new users need admin approval before they can authenticate
+  # Set to false to allow automatic approval for trusted environments
+  require_approval: true
+
+  # Email allowlist - list of email addresses allowed to register
+  # Leave empty to allow any email address (not recommended for production)
+  allowed_emails:
+    # Example emails (uncomment and modify as needed):
+    # - "admin@yourcompany.com"
+    # - "user1@yourcompany.com"
+    # - "user2@yourcompany.com"
+
+# Environment-specific overrides can be set via environment variables:
+# - PORT: Server port
+# - HOST: Server host
+# - WEBAUTHN_RP_ID: WebAuthn Relying Party ID
+# - DATABASE_PATH: Database file path
+# - SESSION_SECRET: Session encryption secret
+# - ALLOWED_EMAILS: Comma-separated list of allowed emails

@@ -1,0 +1,24 @@
+server:
+  port: "8080"
+  host: "0.0.0.0"
+
+webauthn:
+  rp_display_name: "Passkey Auth"
+  rp_id: "localhost"
+  rp_origins:
+    - "http://localhost:8080"
+
+database:
+  path: "passkey-auth.db"
+
+cors:
+  allowed_origins:
+    - "*"
+
+auth:
+  session_secret: "change-me-in-production"
+  require_approval: true
+  # Email allowlist - leave empty to allow any email
+  allowed_emails:
+    # - "admin@example.com"
+    # - "user@example.com"
