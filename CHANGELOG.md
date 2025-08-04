@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- License changed from MIT to Apache 2.0 for better patent protection and enterprise adoption
+
 ### Added
 - Initial release of Passkey Auth
 - WebAuthn (FIDO2) authentication support
