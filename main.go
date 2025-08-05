@@ -49,6 +49,7 @@ func main() {
 
 	// API routes
 	api := router.PathPrefix("/api").Subrouter()
+	api.HandleFunc("/config", h.GetConfig).Methods("GET")
 	api.HandleFunc("/register/begin", h.BeginRegistration).Methods("POST")
 	api.HandleFunc("/register/finish", h.FinishRegistration).Methods("POST")
 	api.HandleFunc("/login/begin", h.BeginLogin).Methods("POST")

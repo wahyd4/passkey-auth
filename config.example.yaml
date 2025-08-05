@@ -65,6 +65,11 @@ auth:
   # Can also be set via ADMIN_EMAIL environment variable
   admin_email: ""  # Set this to your admin email address
 
+  # Default email to pre-fill in the login form
+  # When set, this email will be automatically filled in the email input field
+  # Leave empty to show an empty email field
+  default_email: ""  # Set this to pre-fill the login form with a default email
+
 # Environment-specific overrides can be set via environment variables:
 # - PORT: Server port
 # - HOST: Server host
@@ -74,3 +79,4 @@ auth:
 # - ALLOWED_EMAILS: Comma-separated list of allowed emails
 # - ADMIN_EMAIL: Admin email address
 # - COOKIE_DOMAIN: Cookie domain for session cookies
+# - DEFAULT_EMAIL: Default email to pre-fill in login form

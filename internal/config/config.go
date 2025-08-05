@@ -42,6 +42,7 @@ type AuthConfig struct {
 	AllowedEmails   []string `yaml:"allowed_emails"`
 	AdminEmail      string   `yaml:"admin_email"`
 	CookieDomain    string   `yaml:"cookie_domain"`
+	DefaultEmail    string   `yaml:"default_email"`
 }
 
 func Load() (*Config, error) {
@@ -121,6 +122,9 @@ func Load() (*Config, error) {
 	}
 	if cookieDomain := os.Getenv("COOKIE_DOMAIN"); cookieDomain != "" {
 		config.Auth.CookieDomain = cookieDomain
+	}
+	if defaultEmail := os.Getenv("DEFAULT_EMAIL"); defaultEmail != "" {
+		config.Auth.DefaultEmail = defaultEmail
 	}
 
 	return config, nil

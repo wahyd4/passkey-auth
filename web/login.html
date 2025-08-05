@@ -282,7 +282,7 @@
             return emailParam;
         }
 
-        // Pre-fill email input if email parameter exists
+        // Pre-fill email input if email parameter exists or from config
         function prefillEmail() {
             const email = getEmailFromUrl();
             if (email) {
@@ -290,6 +290,29 @@
                 if (emailInput) {
                     emailInput.value = decodeURIComponent(email);
                 }
+            } else {
+                // If no email parameter, try to get default email from config
+                loadDefaultEmail();
+            }
+        }
+
+        // Load default email from server configuration
+        async function loadDefaultEmail() {
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    if (config.default_email) {
+                        const emailInput = document.getElementById('email');
+                        if (emailInput && !emailInput.value) {
+                            emailInput.value = config.default_email;
+                            console.log('Pre-filled email from config:', config.default_email);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('Could not load default email from config:', error);
+                // Fail silently - this is not critical functionality
             }
         }
 

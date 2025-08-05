@@ -469,6 +469,14 @@ func (h *Handlers) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, response)
 }
 
+// GetConfig returns public configuration data
+func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
+	configData := map[string]interface{}{
+		"default_email": h.config.Auth.DefaultEmail,
+	}
+	h.writeJSON(w, configData)
+}
+
 // Admin endpoints
 
 // ListUsers returns all users (admin endpoint)
