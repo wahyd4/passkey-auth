@@ -533,21 +533,15 @@
 
         function toggleSignUpMode() {
             isSignUpMode = !isSignUpMode;
-            const authTitle = document.getElementById('authTitle');
             const authSubmitBtn = document.getElementById('authSubmitBtn');
             const toggleModeBtn = document.getElementById('toggleModeBtn');
-            const authDescription = document.querySelector('#authPanel article header p');
 
             if (isSignUpMode) {
-                authTitle.textContent = 'Create your account';
                 authSubmitBtn.textContent = 'Create account with passkey';
                 toggleModeBtn.textContent = 'Already have an account? Sign in';
-                authDescription.textContent = 'Create a new account with secure passkey authentication';
             } else {
-                authTitle.textContent = 'Sign in to your account';
                 authSubmitBtn.textContent = 'Sign in with passkey';
                 toggleModeBtn.textContent = "Don't have an account? Create one";
-                authDescription.textContent = 'Use your passkey for secure authentication';
             }
         }
 
