@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Passkey Authentication</title>
+    <title>Passkey Auth</title>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -40,7 +40,7 @@
 <body>
     <div class="container">
         <div class="spinner"></div>
-        <h2>🔐 Passkey Authentication</h2>
+        <h2>🔐 Passkey Auth</h2>
         <p id="status">Checking authentication status...</p>
     </div>
 
@@ -55,13 +55,13 @@
             // Prefer 'redirect' over 'rd' if both are present
             const redirectParam = urlParams.get('redirect');
             const rdParam = urlParams.get('rd');
-            
+
             console.log('URL params:', {
                 redirect: redirectParam,
                 rd: rdParam,
                 search: window.location.search
             });
-            
+
             return redirectParam || rdParam;
         }
 
@@ -99,7 +99,7 @@
 
         async function checkAuthAndRedirect() {
             const redirectUrl = getRedirectUrl();
-            
+
             if (!redirectUrl) {
                 updateStatus('No redirect URL provided');
                 setTimeout(() => {
@@ -110,7 +110,7 @@
 
             try {
                 updateStatus('Checking authentication...');
-                
+
                 const response = await fetch('/api/auth/status', {
                     credentials: 'include'
                 });

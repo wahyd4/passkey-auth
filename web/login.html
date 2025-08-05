@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>Passkey Authentication</title>
+    <title>Passkey Auth</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <style>
         /* Minimal custom styles - let PicoCSS handle most styling */
@@ -70,6 +70,12 @@
             margin-top: 1rem;
         }
 
+        /* Make login container smaller */
+        #authPanel article {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
         /* Responsive adjustments */
         @media (max-width: 576px) {
             .user-actions {
@@ -88,7 +94,7 @@
     <main class="container">
         <header>
             <hgroup>
-                <h1>🔐 Passkey Authentication</h1>
+                <h1>🔐 Passkey Auth</h1>
                 <p id="headerSubtitle">Secure passwordless authentication</p>
             </hgroup>
             <nav>
@@ -113,11 +119,6 @@
         <!-- Authentication Section -->
         <section id="authPanel" class="auth-panel">
             <article>
-                <header>
-                    <h2 id="authTitle">Sign in to your account</h2>
-                    <p>Use your passkey for secure authentication</p>
-                </header>
-
                 <form id="authForm">
                     <label for="email">
                         Email address

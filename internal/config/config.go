@@ -76,7 +76,7 @@ func Load() (*Config, error) {
 			SessionSecret:   "change-me-in-production",
 			RequireApproval: true,
 			AllowedEmails:   []string{}, // Empty means no email restrictions
-			CookieDomain:    "", // Empty means no domain restriction (current domain only)
+			CookieDomain:    "",         // Empty means no domain restriction (current domain only)
 		},
 	}
 
