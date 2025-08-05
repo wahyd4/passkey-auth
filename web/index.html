@@ -237,6 +237,25 @@
             return base64ToArrayBuffer(base64url);
         }
 
+        // Utility function to extract error message from response
+        function extractErrorMessage(responseText, defaultMessage = 'An error occurred') {
+            let errorMessage = responseText;
+            try {
+                const errorJson = JSON.parse(responseText);
+                if (errorJson.error) {
+                    errorMessage = errorJson.error;
+                }
+            } catch (e) {
+                // If parsing fails, check if it's already a plain text message
+                if (responseText && responseText.trim() !== '') {
+                    errorMessage = responseText;
+                } else {
+                    errorMessage = defaultMessage;
+                }
+            }
+            return errorMessage;
+        }
+
         function arrayBufferToBase64url(buffer) {
             const bytes = new Uint8Array(buffer);
             let binary = '';
@@ -616,7 +635,8 @@
             });
 
             if (!beginResponse.ok) {
-                throw new Error(await beginResponse.text());
+                const errorText = await beginResponse.text();
+                throw new Error(extractErrorMessage(errorText, 'Registration failed'));
             }
 
             const options = await beginResponse.json();
@@ -648,7 +668,7 @@
             if (!finishResponse.ok) {
                 const errorText = await finishResponse.text();
                 console.error('Finish registration error:', errorText);
-                throw new Error(errorText);
+                throw new Error(extractErrorMessage(errorText, 'Registration completion failed'));
             }
 
             showAlert('Account created successfully! Welcome to the platform.');
@@ -672,7 +692,8 @@
             });
 
             if (!beginResponse.ok) {
-                throw new Error(await beginResponse.text());
+                const errorText = await beginResponse.text();
+                throw new Error(extractErrorMessage(errorText, 'Sign in failed'));
             }
 
             const options = await beginResponse.json();
@@ -699,7 +720,8 @@
             });
 
             if (!finishResponse.ok) {
-                throw new Error(await finishResponse.text());
+                const errorText = await finishResponse.text();
+                throw new Error(extractErrorMessage(errorText, 'Authentication failed'));
             }
 
             const result = await finishResponse.json();
@@ -727,7 +749,8 @@
                 }
 
                 if (!response.ok) {
-                    throw new Error('Failed to load users');
+                    const errorText = await response.text();
+                    throw new Error(extractErrorMessage(errorText, 'Failed to load users'));
                 }
 
                 const users = await response.json();
@@ -778,7 +801,8 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to approve user');
+                    const errorText = await response.text();
+                    throw new Error(extractErrorMessage(errorText, 'Failed to approve user'));
                 }
 
                 showAlert('User approved successfully');
@@ -800,7 +824,8 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to delete user');
+                    const errorText = await response.text();
+                    throw new Error(extractErrorMessage(errorText, 'Failed to delete user'));
                 }
 
                 showAlert('User deleted successfully');
