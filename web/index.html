@@ -256,6 +256,28 @@
             return errorMessage;
         }
 
+        // Redirect handling for nginx auth_request
+        function getRedirectUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('redirect') || urlParams.get('rd');
+        }
+
+        function redirectAfterAuth() {
+            const redirectUrl = getRedirectUrl();
+            if (redirectUrl) {
+                try {
+                    // Decode the URL if it's encoded
+                    const decodedUrl = decodeURIComponent(redirectUrl);
+                    console.log('Redirecting to:', decodedUrl);
+                    window.location.href = decodedUrl;
+                    return true;
+                } catch (error) {
+                    console.error('Error decoding redirect URL:', error);
+                }
+            }
+            return false;
+        }
+
         function arrayBufferToBase64url(buffer) {
             const bytes = new Uint8Array(buffer);
             let binary = '';
@@ -673,8 +695,11 @@
 
             showAlert('Account created successfully! Welcome to the platform.');
 
-            // Check auth status to show welcome panel
-            setTimeout(checkAuthStatus, 100);
+            // Check for redirect first, then fall back to checking auth status
+            if (!redirectAfterAuth()) {
+                // Check auth status to show welcome panel
+                setTimeout(checkAuthStatus, 100);
+            }
         }
 
         // Sign In Handler
@@ -727,8 +752,11 @@
             const result = await finishResponse.json();
             showAlert(`Welcome back, ${result.user.display_name}!`);
 
-            // Check auth status to show welcome panel
-            setTimeout(checkAuthStatus, 100);
+            // Check for redirect first, then fall back to checking auth status
+            if (!redirectAfterAuth()) {
+                // Check auth status to show welcome panel
+                setTimeout(checkAuthStatus, 100);
+            }
         }
 
         // Users management
@@ -840,8 +868,25 @@
             // Load theme first
             loadTheme();
 
+            // Check if there's a redirect URL and update header
+            const redirectUrl = getRedirectUrl();
+            if (redirectUrl) {
+                try {
+                    const decodedUrl = decodeURIComponent(redirectUrl);
+                    const targetDomain = new URL(decodedUrl).hostname;
+                    document.getElementById('headerSubtitle').textContent = `Authenticating for ${targetDomain}`;
+                } catch (error) {
+                    document.getElementById('headerSubtitle').textContent = 'Authenticating for protected resource';
+                }
+            }
+
             // Check authentication status to determine initial UI state
-            await checkAuthStatus();
+            const user = await checkAuthStatus();
+
+            // If user is already authenticated and there's a redirect parameter, redirect immediately
+            if (user && redirectUrl) {
+                setTimeout(() => redirectAfterAuth(), 1000); // Give user a moment to see the message
+            }
         });
     </script>
 </body>
