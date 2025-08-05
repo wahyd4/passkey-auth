@@ -274,6 +274,25 @@
             return redirectParam || rdParam;
         }
 
+        // Extract email parameter from URL
+        function getEmailFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailParam = urlParams.get('email');
+
+            return emailParam;
+        }
+
+        // Pre-fill email input if email parameter exists
+        function prefillEmail() {
+            const email = getEmailFromUrl();
+            if (email) {
+                const emailInput = document.getElementById('email');
+                if (emailInput) {
+                    emailInput.value = decodeURIComponent(email);
+                }
+            }
+        }
+
         function redirectAfterAuth() {
             const redirectUrl = getRedirectUrl();
             console.log('Checking for redirect URL:', redirectUrl);
@@ -894,6 +913,9 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // Load theme first
             loadTheme();
+
+            // Pre-fill email if provided in URL parameters
+            prefillEmail();
 
             // Check if there's a redirect URL and update header
             const redirectUrl = getRedirectUrl();
