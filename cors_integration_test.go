@@ -12,7 +12,7 @@ func TestWildcardCORSIntegration(t *testing.T) {
 	// Create a simple test handler
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Create CORS middleware with wildcard support

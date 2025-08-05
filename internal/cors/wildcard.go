@@ -82,16 +82,32 @@ func (m *WildcardMatcher) wildcardMatch(origin, pattern string) bool {
 // This expands wildcard patterns based on the request origin
 func (m *WildcardMatcher) GetAllowedOrigins(requestOrigin string, staticOrigins []string) []string {
 	allowedOrigins := make([]string, 0, len(staticOrigins))
+	hasMatchingWildcard := false
 
+	// First pass: check if any wildcard matches
+	for _, origin := range staticOrigins {
+		if strings.Contains(origin, "*") {
+			if m.matchPattern(requestOrigin, origin) {
+				hasMatchingWildcard = true
+				break
+			}
+		}
+	}
+
+	// Second pass: build the result based on the logic
 	for _, origin := range staticOrigins {
 		if strings.Contains(origin, "*") {
 			// This is a wildcard pattern
 			if m.matchPattern(requestOrigin, origin) {
 				// Add the actual request origin instead of the pattern
 				allowedOrigins = append(allowedOrigins, requestOrigin)
+			} else if !hasMatchingWildcard {
+				// No wildcards match, so include this wildcard pattern as-is
+				allowedOrigins = append(allowedOrigins, origin)
 			}
+			// If a wildcard matches but this one doesn't, skip it (don't add anything)
 		} else {
-			// This is a static origin, add as-is
+			// This is a static origin, always add as-is
 			allowedOrigins = append(allowedOrigins, origin)
 		}
 	}

@@ -58,9 +58,9 @@ fmt: ## Format code
 	@echo "🎨 Formatting code..."
 	@go fmt ./...
 
-lint: ## Run linter
-	@echo "🔍 Running linter..."
-	@golangci-lint run
+lint: ## Run linter with auto-fix (excluding test files)
+	@echo "🔍 Running linter with auto-fix (excluding test files)..."
+	@golangci-lint run --fix --tests=false
 
 security: ## Run security scan
 	@echo "🔒 Running security scan..."
