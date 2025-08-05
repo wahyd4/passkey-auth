@@ -93,21 +93,16 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create new user
+	// Create a temporary WebAuthn user for registration without saving to DB yet
 	isAdmin := h.config.IsAdmin(req.Email)
-	user, err := h.db.CreateUserWithApproval(req.Email, req.DisplayName, isAdmin)
-	if err != nil {
-		logrus.Errorf("Failed to create user: %v", err)
-		h.writeError(w, "Failed to create user", http.StatusInternalServerError)
-		return
-	}
-
-	if isAdmin {
-		logrus.Infof("Admin user auto-approved: %s", req.Email)
+	tempUser := &database.User{
+		Email:       req.Email,
+		DisplayName: req.DisplayName,
+		Approved:    isAdmin, // Auto-approve admins
 	}
 
 	webAuthnUser := &auth.WebAuthnUser{}
-	webAuthnUser.SetUser(user)
+	webAuthnUser.SetUser(tempUser)
 
 	options, sessionData, err := h.webAuthn.BeginRegistration(webAuthnUser)
 	if err != nil {
@@ -116,10 +111,12 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store session data
+	// Store session data with user details for later creation
 	session, _ := h.store.Get(r, "webauthn-session")
 	session.Values["challenge"] = sessionData.Challenge
-	session.Values["user_id"] = user.ID
+	session.Values["pending_email"] = req.Email
+	session.Values["pending_display_name"] = req.DisplayName
+	session.Values["pending_is_admin"] = isAdmin
 	if err := session.Save(r, w); err != nil {
 		h.writeError(w, "Failed to save session", http.StatusInternalServerError)
 		return
@@ -139,15 +136,28 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	session, _ := h.store.Get(r, "webauthn-session")
 
-	userID, ok := session.Values["user_id"].(int)
+	// Get pending user data from session instead of user_id
+	pendingEmail, ok := session.Values["pending_email"].(string)
 	if !ok {
-		h.writeError(w, "Invalid session", http.StatusBadRequest)
+		h.writeError(w, "Invalid session - no pending registration", http.StatusBadRequest)
+		return
+	}
+
+	pendingDisplayName, ok := session.Values["pending_display_name"].(string)
+	if !ok {
+		h.writeError(w, "Invalid session - missing display name", http.StatusBadRequest)
+		return
+	}
+
+	pendingIsAdmin, ok := session.Values["pending_is_admin"].(bool)
+	if !ok {
+		h.writeError(w, "Invalid session - missing admin flag", http.StatusBadRequest)
 		return
 	}
 
 	challenge, ok := session.Values["challenge"].(string)
 	if !ok {
-		h.writeError(w, "Invalid session", http.StatusBadRequest)
+		h.writeError(w, "Invalid session - missing challenge", http.StatusBadRequest)
 		return
 	}
 
@@ -162,14 +172,15 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	// Create a new reader from the body for the WebAuthn library
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
 
-	user, err := h.db.GetUser(userID)
-	if err != nil {
-		h.writeError(w, "User not found", http.StatusNotFound)
-		return
+	// Create temporary user for WebAuthn verification
+	tempUser := &database.User{
+		Email:       pendingEmail,
+		DisplayName: pendingDisplayName,
+		Approved:    pendingIsAdmin,
 	}
 
 	webAuthnUser := &auth.WebAuthnUser{}
-	webAuthnUser.SetUser(user)
+	webAuthnUser.SetUser(tempUser)
 
 	sessionData := webauthn.SessionData{
 		Challenge: challenge,
@@ -177,7 +188,7 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the request details for debugging
-	logrus.Debugf("Finishing registration for user: %s", user.Email)
+	logrus.Debugf("Finishing registration for user: %s", pendingEmail)
 	logrus.Debugf("Session challenge: %s", challenge)
 	logrus.Debugf("Session user ID: %v", webAuthnUser.WebAuthnID())
 
@@ -188,9 +199,29 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only NOW create the user in the database after successful passkey registration
+	user, err := h.db.CreateUserWithApproval(pendingEmail, pendingDisplayName, pendingIsAdmin)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			h.writeError(w, "User already exists", http.StatusConflict)
+			return
+		}
+		logrus.Errorf("Failed to create user: %v", err)
+		h.writeError(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	if pendingIsAdmin {
+		logrus.Infof("Admin user auto-approved: %s", pendingEmail)
+	}
+
 	// Save credential to database
 	if err := h.webAuthn.SaveCredential(user.ID, credential); err != nil {
 		logrus.Errorf("Failed to save credential: %v", err)
+		// If we can't save the credential, we should remove the user we just created
+		if deleteErr := h.db.DeleteUser(user.ID); deleteErr != nil {
+			logrus.Errorf("Failed to cleanup user after credential save failure: %v", deleteErr)
+		}
 		h.writeError(w, "Failed to save credential", http.StatusInternalServerError)
 		return
 	}
@@ -207,7 +238,9 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// Clear webauthn session
 	session.Values["challenge"] = nil
-	session.Values["user_id"] = nil
+	session.Values["pending_email"] = nil
+	session.Values["pending_display_name"] = nil
+	session.Values["pending_is_admin"] = nil
 	if err := session.Save(r, w); err != nil {
 		log.Printf("Failed to save session: %v", err)
 		// Don't return error here as the main operation succeeded
@@ -427,7 +460,7 @@ func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	
+
 	users, err := h.db.ListUsers()
 	if err != nil {
 		logrus.Errorf("Failed to list users: %v", err)
@@ -443,7 +476,7 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	
+
 	var req struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"display_name"`
@@ -480,7 +513,7 @@ func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	
+
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok {
@@ -529,7 +562,7 @@ func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {
 		return
 	}
-	
+
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok {
