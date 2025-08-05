@@ -45,6 +45,14 @@ auth:
   # Set to false to allow automatic approval for trusted environments
   require_approval: true
 
+  # Cookie domain for session cookies
+  # Leave empty for single domain (cookies only work on current domain)
+  # Set to ".yourdomain.com" to share cookies across all subdomains
+  # Examples:
+  # - "" (empty) - cookies only work on the exact domain
+  # - ".example.com" - cookies work on example.com and all subdomains
+  cookie_domain: ""
+
   # Email allowlist - list of email addresses allowed to register
   # Leave empty to allow any email address (not recommended for production)
   allowed_emails:
@@ -65,3 +73,4 @@ auth:
 # - SESSION_SECRET: Session encryption secret
 # - ALLOWED_EMAILS: Comma-separated list of allowed emails
 # - ADMIN_EMAIL: Admin email address
+# - COOKIE_DOMAIN: Cookie domain for session cookies

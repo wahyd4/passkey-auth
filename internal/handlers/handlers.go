@@ -35,6 +35,7 @@ func New(db *database.DB, webAuthn *auth.WebAuthn, config *config.Config) *Handl
 		HttpOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
+		Domain:   config.Auth.CookieDomain, // Share cookies across subdomains if configured
 	}
 
 	return &Handlers{
@@ -393,10 +394,24 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 
 // AuthCheck implements the nginx auth_request protocol
 func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
-	session, _ := h.store.Get(r, "auth-session")
+	// Debug logging
+	logrus.Debugf("AuthCheck request from %s", r.RemoteAddr)
+	logrus.Debugf("AuthCheck headers: %+v", r.Header)
+	logrus.Debugf("AuthCheck cookies: %+v", r.Cookies())
+
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		logrus.Errorf("Failed to get auth session: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	authenticated, ok := session.Values["authenticated"].(bool)
+	logrus.Debugf("Session authenticated: %v, ok: %v", authenticated, ok)
+	logrus.Debugf("Session values: %+v", session.Values)
+
 	if !ok || !authenticated {
+		logrus.Debugf("User not authenticated, returning 401")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -409,6 +424,7 @@ func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Auth-User", userEmail)
 	}
 
+	logrus.Debugf("User authenticated, returning 200")
 	w.WriteHeader(http.StatusOK)
 }
 

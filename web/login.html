@@ -263,13 +263,13 @@
             // Prefer 'redirect' over 'rd' if both are present
             const redirectParam = urlParams.get('redirect');
             const rdParam = urlParams.get('rd');
-            
+
             console.log('URL params:', {
                 redirect: redirectParam,
                 rd: rdParam,
                 search: window.location.search
             });
-            
+
             return redirectParam || rdParam;
         }
 
@@ -281,14 +281,14 @@
                     // Decode the URL if it's encoded
                     const decodedUrl = decodeURIComponent(redirectUrl);
                     console.log('Decoded redirect URL:', decodedUrl);
-                    
+
                     // Validate the URL
                     const url = new URL(decodedUrl);
                     console.log('Parsed URL:', url.href);
-                    
+
                     // Show a brief message before redirecting
                     showAlert(`Redirecting to ${url.hostname}...`, 'success');
-                    
+
                     setTimeout(() => {
                         console.log('Executing redirect to:', decodedUrl);
                         window.location.href = decodedUrl;

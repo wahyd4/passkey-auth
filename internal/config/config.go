@@ -41,6 +41,7 @@ type AuthConfig struct {
 	RequireApproval bool     `yaml:"require_approval"`
 	AllowedEmails   []string `yaml:"allowed_emails"`
 	AdminEmail      string   `yaml:"admin_email"`
+	CookieDomain    string   `yaml:"cookie_domain"`
 }
 
 func Load() (*Config, error) {
@@ -75,6 +76,7 @@ func Load() (*Config, error) {
 			SessionSecret:   "change-me-in-production",
 			RequireApproval: true,
 			AllowedEmails:   []string{}, // Empty means no email restrictions
+			CookieDomain:    "", // Empty means no domain restriction (current domain only)
 		},
 	}
 
@@ -116,6 +118,9 @@ func Load() (*Config, error) {
 	}
 	if adminEmail := os.Getenv("ADMIN_EMAIL"); adminEmail != "" {
 		config.Auth.AdminEmail = adminEmail
+	}
+	if cookieDomain := os.Getenv("COOKIE_DOMAIN"); cookieDomain != "" {
+		config.Auth.CookieDomain = cookieDomain
 	}
 
 	return config, nil
