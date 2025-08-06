@@ -2,6 +2,21 @@
 
 A WebAuthn-based passkey authentication provider that integrates ingress controllers, currently support Kubernetes Nginx Ingress controller. Provides secure, passwordless authentication using passkeys (FIDO2/WebAuthn) as an auth backend for nginx ingress.
 
+## TLDR;
+
+Log in Apps without typing password or going through 3rd Party Oauth!
+
+I use it for signing into my home lab apps.
+
+## 🎬 Demo
+
+Click the screenshot below to watch the passkey authentication in action and see how smooth it is:
+
+<a href="demo.MOV">
+  <img src="passkey-auth-screenshot.png" alt="Click to play demo - Passkey Auth Interface" width="200">
+</a>
+
+
 ## ✨ Features
 
 - **Passwordless Authentication**: Uses WebAuthn/FIDO2 passkeys for secure authentication
