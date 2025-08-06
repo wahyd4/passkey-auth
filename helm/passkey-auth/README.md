@@ -22,7 +22,6 @@ helm install my-passkey-auth passkey-auth/passkey-auth \
 - Kubernetes 1.19+
 - Helm 3.0+
 - Nginx Ingress Controller
-- Cert-Manager (for TLS certificates)
 - StorageClass for persistent volumes
 
 ## Installation
