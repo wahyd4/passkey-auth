@@ -10,8 +10,8 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: "main"
 
-imagePullSecrets:
-  - name: github-image-pull-secret
+imagePullSecrets: []
+  # - name: github-registry-secret
 
 nameOverride: ""
 fullnameOverride: ""
@@ -150,8 +150,11 @@ env:
 
 # Secret environment variables
 secrets:
-  # Session secret for cookie signing
+  # Session secret for cookie signing (only used if existingSecret is not set)
   sessionSecret: ""
+  # Use an existing secret instead of creating one (recommended for production)
+  # The secret should contain a key named "session-secret"
+  existingSecret: ""
 
 # Additional environment variables from existing secrets
 envFrom: []

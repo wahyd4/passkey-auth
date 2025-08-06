@@ -74,6 +74,10 @@ config:
 secrets:
   sessionSecret: "your-secure-random-secret"    # Session signing secret
 
+# OR use existing secret (recommended for production)
+secrets:
+  existingSecret: "passkey-auth-secrets"        # Reference to existing secret
+
 ingress:
   hosts:
     - host: auth.example.com
@@ -113,14 +117,99 @@ persistence:
 
 ### External Secrets
 
+For production deployments, it's recommended to create secrets manually and reference them:
+
+```bash
+# Create the secret manually
+kubectl create secret generic passkey-auth-secrets \
+  --from-literal=session-secret="$(openssl rand -base64 32)"
+
+# Reference it in values.yaml
+secrets:
+  existingSecret: "passkey-auth-secrets"
+```
+
+Or use external secret management tools:
+
 ```yaml
 envFrom:
   - secretRef:
       name: external-secrets
 
-secrets: {}  # Don't create internal secret
+secrets:
+  existingSecret: "external-passkey-secrets"  # Reference external secret
 ```
 
+### Image Pull Secrets
+
+The chart uses the public GitHub Container Registry by default, but you may need to configure image pull secrets for:
+
+- **Private container registries**
+- **GitHub Container Registry with authentication** (for private repositories or rate limiting)
+- **Other private registry providers**
+
+#### Creating Image Pull Secrets
+
+**For GitHub Container Registry:**
+
+```bash
+# Create a GitHub Personal Access Token with 'read:packages' permission
+# Then create the secret:
+kubectl create secret docker-registry github-registry-secret \
+  --docker-server=ghcr.io \
+  --docker-username=your-github-username \
+  --docker-password=your-github-token \
+  --docker-email=your-email@example.com
+```
+
+**For Docker Hub:**
+
+```bash
+kubectl create secret docker-registry dockerhub-secret \
+  --docker-server=docker.io \
+  --docker-username=your-dockerhub-username \
+  --docker-password=your-dockerhub-password \
+  --docker-email=your-email@example.com
+```
+
+**For private registry:**
+
+```bash
+kubectl create secret docker-registry private-registry-secret \
+  --docker-server=your-registry.example.com \
+  --docker-username=your-username \
+  --docker-password=your-password \
+  --docker-email=your-email@example.com
+```
+
+#### Configuring Image Pull Secrets in values.yaml
+
+**Single image pull secret:**
+
+```yaml
+imagePullSecrets:
+  - name: github-registry-secret
+```
+
+**Multiple image pull secrets:**
+
+```yaml
+imagePullSecrets:
+  - name: github-registry-secret
+  - name: private-registry-secret
+```
+
+**Complete example for private GitHub repository:**
+
+```yaml
+image:
+  repository: ghcr.io/your-org/passkey-auth
+  tag: "v1.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: github-registry-secret
+```
 
 ## Parameters
 
@@ -141,7 +230,7 @@ secrets: {}  # Don't create internal secret
 | `image.repository`            | Passkey Auth image repository                                   | `ghcr.io/wahyd4/passkey-auth`     |
 | `image.tag`                   | Passkey Auth image tag (immutable tags are recommended)        | `main`                             |
 | `image.pullPolicy`            | Passkey Auth image pull policy                                 | `Always`                           |
-| `image.pullSecrets`           | Passkey Auth image pull secrets                                | `[]`                               |
+| `imagePullSecrets`            | List of image pull secrets for private registries             | `[]`                               |
 
 ### WebAuthn configuration
 
@@ -198,7 +287,8 @@ secrets: {}  # Don't create internal secret
 
 | Name                                              | Description                                                     | Value                                          |
 | ------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
-| `secrets.sessionSecret`                          | Session secret for signing cookies (change in production!)     | `change-me-in-production-use-long-random-string` |
+| `secrets.sessionSecret`                          | Session secret for signing cookies (only used if existingSecret is not set) | `""`                                         |
+| `secrets.existingSecret`                         | Name of existing secret containing session-secret key         | `""`                                         |
 | `podSecurityContext.fsGroup`                     | Group ID for the pods                                          | `1000`                                         |
 | `securityContext.allowPrivilegeEscalation`      | Allow privilege escalation for containers                      | `false`                                        |
 | `securityContext.runAsNonRoot`                  | Run containers as non-root user                                | `true`                                         |

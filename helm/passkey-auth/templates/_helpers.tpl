@@ -72,7 +72,11 @@ Create the name of the configmap
 Create the name of the secret
 */}}
 {{- define "passkey-auth.secretName" -}}
+{{- if .Values.secrets.existingSecret }}
+{{- .Values.secrets.existingSecret }}
+{{- else }}
 {{- printf "%s-secrets" (include "passkey-auth.fullname" .) }}
+{{- end }}
 {{- end }}
 
 {{/*

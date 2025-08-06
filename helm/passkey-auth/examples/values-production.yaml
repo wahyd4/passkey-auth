@@ -30,7 +30,12 @@ config:
 
 # Security configuration
 secrets:
-  sessionSecret: ""  # REQUIRED: Set this to a secure random string (32+ chars)
+  # Option 1: Create secret from values (less secure)
+  # sessionSecret: ""  # REQUIRED: Set this to a secure random string (32+ chars)
+
+  # Option 2: Use existing secret (recommended for production)
+  # Create the secret manually: kubectl create secret generic passkey-auth-secrets --from-literal=session-secret="your-secret-here"
+  existingSecret: "passkey-auth-secrets"
 
 # Ingress configuration
 ingress:
