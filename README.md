@@ -27,18 +27,8 @@ A WebAuthn-based passkey authentication provider that integrates ingress control
 helm repo add passkey-auth https://wahyd4.github.io/passkey-auth
 helm repo update
 
-# Install with your configuration
-helm install my-passkey-auth passkey-auth/passkey-auth \
-  --set config.webauthn.rpId=auth.example.com \
-  --set config.webauthn.rpOrigins="{https://auth.example.com}" \
-  --set config.cors.allowedOrigins="{https://*.example.com}" \
-  --set config.auth.cookieDomain=".example.com" \
-  --set config.auth.allowedEmails="{admin@example.com}" \
-  --set ingress.hosts[0].host=auth.example.com \
-  --set secrets.sessionSecret="your-secure-random-secret-key"
-
-# Or use a values file
-helm install my-passkey-auth passkey-auth/passkey-auth -f values-production.yaml
+# Install with your values
+helm upgrade --install my-passkey-auth -n home-apps -f my-values.yaml  passkey-auth/passkey-auth
 ```
 
 See the [Helm Chart README](helm/passkey-auth/README.md) for detailed configuration options.

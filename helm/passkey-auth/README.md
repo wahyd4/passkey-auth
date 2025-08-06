@@ -11,10 +11,7 @@ This chart deploys a secure, passwordless authentication service using WebAuthn/
 ```bash
 helm repo add passkey-auth https://wahyd4.github.io/passkey-auth
 helm repo update
-helm install my-passkey-auth passkey-auth/passkey-auth \
-  --set config.webauthn.rpId=auth.example.com \
-  --set config.webauthn.rpOrigins="{https://auth.example.com}" \
-  --set secrets.sessionSecret="your-very-long-random-secret-key-here"
+helm upgrade --install my-passkey-auth -n home-apps -f my-values.yaml  passkey-auth/passkey-auth
 ```
 
 ## Prerequisites
@@ -140,76 +137,6 @@ secrets:
   existingSecret: "external-passkey-secrets"  # Reference external secret
 ```
 
-### Image Pull Secrets
-
-The chart uses the public GitHub Container Registry by default, but you may need to configure image pull secrets for:
-
-- **Private container registries**
-- **GitHub Container Registry with authentication** (for private repositories or rate limiting)
-- **Other private registry providers**
-
-#### Creating Image Pull Secrets
-
-**For GitHub Container Registry:**
-
-```bash
-# Create a GitHub Personal Access Token with 'read:packages' permission
-# Then create the secret:
-kubectl create secret docker-registry github-registry-secret \
-  --docker-server=ghcr.io \
-  --docker-username=your-github-username \
-  --docker-password=your-github-token \
-  --docker-email=your-email@example.com
-```
-
-**For Docker Hub:**
-
-```bash
-kubectl create secret docker-registry dockerhub-secret \
-  --docker-server=docker.io \
-  --docker-username=your-dockerhub-username \
-  --docker-password=your-dockerhub-password \
-  --docker-email=your-email@example.com
-```
-
-**For private registry:**
-
-```bash
-kubectl create secret docker-registry private-registry-secret \
-  --docker-server=your-registry.example.com \
-  --docker-username=your-username \
-  --docker-password=your-password \
-  --docker-email=your-email@example.com
-```
-
-#### Configuring Image Pull Secrets in values.yaml
-
-**Single image pull secret:**
-
-```yaml
-imagePullSecrets:
-  - name: github-registry-secret
-```
-
-**Multiple image pull secrets:**
-
-```yaml
-imagePullSecrets:
-  - name: github-registry-secret
-  - name: private-registry-secret
-```
-
-**Complete example for private GitHub repository:**
-
-```yaml
-image:
-  repository: ghcr.io/your-org/passkey-auth
-  tag: "v1.0.0"
-  pullPolicy: IfNotPresent
-
-imagePullSecrets:
-  - name: github-registry-secret
-```
 
 ## Parameters
 
