@@ -8,3 +8,4 @@ target-branch: gh-pages
 package-path: .cr-release-packages
 index-path: .cr-index
 skip-existing: true
+push: true

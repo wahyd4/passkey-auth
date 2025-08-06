@@ -9,7 +9,7 @@ This chart deploys a secure, passwordless authentication service using WebAuthn/
 ## TL;DR
 
 ```bash
-helm repo add passkey-auth https://your-github-username.github.io/passkey-auth-helm
+helm repo add passkey-auth https://wahyd4.github.io/passkey-auth
 helm repo update
 helm install my-passkey-auth passkey-auth/passkey-auth \
   --set config.webauthn.rpId=auth.example.com \
@@ -29,7 +29,7 @@ helm install my-passkey-auth passkey-auth/passkey-auth \
 ### Add Helm Repository
 
 ```bash
-helm repo add passkey-auth https://your-github-username.github.io/passkey-auth-helm
+helm repo add passkey-auth https://wahyd4.github.io/passkey-auth
 helm repo update
 ```
 
@@ -81,7 +81,6 @@ ingress:
         - path: /
           pathType: Prefix
 ```
-
 
 ## Setup Authentication for Your Services
 
