@@ -1,0 +1,10 @@
+# Configuration for chart-releaser
+# See https://github.com/helm/chart-releaser for more info
+
+owner: wahyd4
+git-repo: passkey-auth
+charts-repo: https://wahyd4.github.io/passkey-auth
+target-branch: gh-pages
+package-path: .cr-release-packages
+index-path: .cr-index
+skip-existing: true

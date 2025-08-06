@@ -1,0 +1,165 @@
+# Default values for passkey-auth.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/wahyd4/passkey-auth
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "main"
+
+imagePullSecrets:
+  - name: github-image-pull-secret
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "passkey-auth-headers"
+    nginx.ingress.kubernetes.io/upstream-vhost: ""  # Will be set to config.webauthn.rpId
+    nginx.ingress.kubernetes.io/proxy-redirect-from: "http://"
+    nginx.ingress.kubernetes.io/proxy-redirect-to: "https://"
+  hosts:
+    - host: pass.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: passkey-auth-tls
+      hosts:
+        - pass.example.com
+
+resources:
+  limits:
+    cpu: 400m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Persistent storage for SQLite database
+persistence:
+  enabled: true
+  storageClass: ""  # Use default storage class
+  accessMode: ReadWriteOnce
+  size: 2Gi
+  # existingClaim: ""
+
+# Health check configuration
+healthCheck:
+  enabled: true
+  path: /health
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  startupProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 6
+
+# Application configuration
+config:
+  server:
+    port: "8080"
+    host: "0.0.0.0"
+
+  webauthn:
+    rpDisplayName: "Passkey Auth"
+    rpId: "pass.example.com"
+    rpOrigins:
+      - "https://pass.example.com"
+
+  database:
+    path: "/data/passkey-auth.db"
+
+  cors:
+    allowedOrigins:
+      - "https://*.example.com"
+
+  auth:
+    requireApproval: true
+    cookieDomain: ".example.com"
+    allowedEmails:
+      - "admin@example.com"
+    # adminEmail will be set via environment variable
+
+# Environment variables
+env:
+  - name: DEFAULT_EMAIL
+    value: "admin@example.com"
+  - name: CONFIG_PATH
+    value: "/app/config.yaml"
+  - name: ADMIN_EMAIL
+    value: "admin@example.com"
+
+# Secret environment variables
+secrets:
+  # Session secret for cookie signing
+  sessionSecret: "change-me-in-production-use-long-random-string"
+
+# Additional environment variables from existing secrets
+envFrom: []
+# - secretRef:
+#     name: my-secret
+
+# Additional volume mounts
+volumeMounts: []
+
+# Additional volumes
+volumes: []
