@@ -151,7 +151,7 @@ env:
 # Secret environment variables
 secrets:
   # Session secret for cookie signing
-  sessionSecret: "change-me-in-production-use-long-random-string"
+  sessionSecret: ""
 
 # Additional environment variables from existing secrets
 envFrom: []
