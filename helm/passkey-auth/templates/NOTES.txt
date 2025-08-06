@@ -30,7 +30,7 @@
 
 3. Visit the admin panel to manage users:
 {{- if .Values.ingress.enabled }}
-  http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/admin
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/
 {{- end }}
 
 Important Security Notes:
