@@ -10,13 +10,12 @@ metadata:
   name: {{ $fullName }}
   labels:
     {{- include "passkey-auth.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-    {{- if not (hasKey . "nginx.ingress.kubernetes.io/upstream-vhost") }}
-    nginx.ingress.kubernetes.io/upstream-vhost: {{ $.Values.config.webauthn.rpId | quote }}
-    {{- end }}
+  {{- $annotations := (deepCopy (default (dict) .Values.ingress.annotations)) }}
+  {{- if not (hasKey $annotations "nginx.ingress.kubernetes.io/upstream-vhost") }}
+    {{- $_ := set $annotations "nginx.ingress.kubernetes.io/upstream-vhost" $.Values.config.webauthn.rpId }}
   {{- end }}
+  annotations:
+    {{- toYaml $annotations | nindent 4 }}
 spec:
   {{- if and .Values.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
   ingressClassName: {{ .Values.ingress.className }}
