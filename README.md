@@ -10,17 +10,13 @@ I use it for signing into my home lab apps.
 
 ## 🎬 Demo
 
-Click the screenshot below to watch the passkey authentication in action and see how smooth it is:
-
-<a href="demo.MOV">
+<a href="https://giphy.com/gifs/vBeSrnuYUl3u1AQho6">
   <img src="passkey-auth-screenshot.png" alt="Click to play demo - Passkey Auth Interface" width="200">
 </a>
-
 
 ## ✨ Features
 
 - **Passwordless Authentication**: Uses WebAuthn/FIDO2 passkeys for secure authentication
-- **Email-Based Access Control**: Users identified by email with configurable allowlists
 - **Nginx Ingress Integration**: Works as auth backend using nginx `auth_request` directive
 - **User Management**: An simple Admin interface for managing users and approval status
 - **Kubernetes Native**: Designed for Kubernetes deployment with persistent storage
