@@ -4,7 +4,7 @@ A Helm chart for deploying Passkey Auth, a WebAuthn-based passkey authentication
 
 ## Overview
 
-This chart deploys a secure, passwordless authentication service using WebAuthn/FIDO2 passkeys. It's designed to work as an authentication backend for nginx ingress controllers, providing enterprise-grade security without the complexity of traditional password-based systems.
+This chart deploys a secure, passwordless authentication service using WebAuthn/FIDO2 passkeys.
 
 ## TL;DR
 
