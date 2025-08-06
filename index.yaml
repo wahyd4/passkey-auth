@@ -6,6 +6,32 @@ entries:
       licenses: Apache-2.0
     apiVersion: v2
     appVersion: main
+    created: "2025-08-06T12:36:03.515437196Z"
+    description: A WebAuthn-based passkey authentication provider for Kubernetes Nginx
+      Ingress
+    digest: 3d9c4b923013fbf9ea3650e8f327b4ba566271ff090c83b28cbdaa6323fbc188
+    home: https://github.com/wahyd4/passkey-auth
+    keywords:
+    - authentication
+    - webauthn
+    - passkey
+    - nginx-ingress
+    - security
+    maintainers:
+    - email: wahyd4@gmail.com
+      name: Junwei Zhao
+    name: passkey-auth
+    sources:
+    - https://github.com/wahyd4/passkey-auth
+    type: application
+    urls:
+    - https://github.com/wahyd4/passkey-auth/releases/download/passkey-auth-0.1.1/passkey-auth-0.1.1.tgz
+    version: 0.1.1
+  - annotations:
+      category: Security
+      licenses: Apache-2.0
+    apiVersion: v2
+    appVersion: main
     created: "2025-08-06T11:52:19.801548049Z"
     description: A WebAuthn-based passkey authentication provider for Kubernetes Nginx
       Ingress
@@ -27,4 +53,4 @@ entries:
     urls:
     - https://github.com/wahyd4/passkey-auth/releases/download/passkey-auth-0.1.0/passkey-auth-0.1.0.tgz
     version: 0.1.0
-generated: "2025-08-06T11:52:19.801558901Z"
+generated: "2025-08-06T12:36:03.515450621Z"
