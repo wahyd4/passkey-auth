@@ -1,6 +1,6 @@
 # 🔐 Passkey Auth for Kubernetes Nginx Ingress
 
-A WebAuthn-based passkey authentication provider that integrates ingress controllers, currently support Kubernetes Nginx Ingress controller. Provides secure, passwordless authentication using passkeys (FIDO2/WebAuthn) as an auth backend for nginx ingress.
+A WebAuthn-based passkey authentication provider that integrates ingress controllers, currently support Kubernetes nginx Ingress controller. Provides secure, passwordless authentication using passkeys (FIDO2/WebAuthn) as an auth backend for nginx ingress.
 
 ## TLDR;
 
