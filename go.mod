@@ -7,7 +7,7 @@ require (
 	github.com/go-webauthn/webauthn v0.10.2
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/sessions v1.2.2
-	github.com/rs/cors v1.10.1
+	github.com/rs/cors v1.11.0
 	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/yaml.v2 v2.4.0
 )
