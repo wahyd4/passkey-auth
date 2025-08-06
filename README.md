@@ -44,8 +44,13 @@ helm upgrade --install my-passkey-auth -n home-apps -f my-values.yaml  passkey-a
 
 See the [Helm Chart README](helm/passkey-auth/README.md) for detailed configuration options.
 
+### Test with Docker
 
-### Option 3: Local Development
+```bash
+docker run --name passkey-auth -d -p 8080:8080 -e ADMIN_EMAIL="admin@example.com"  ghcr.io/wahyd4/passkey-auth:main
+```
+
+### Local Development
 
 ```bash
 # Install dependencies and run locally
@@ -55,25 +60,8 @@ go run main.go
 # Access at http://localhost:8080
 ```
 
-### 2. Configure
 
-Edit `k8s/deployment.yaml` to update your domain:
-
-```yaml
-webauthn:
-  rp_id: "your-domain.com"
-  rp_origins:
-    - "https://your-domain.com"
-
-cors:
-  allowed_origins:
-    - "https://your-domain.com"
-
-auth:
-  session_secret: "your-secure-secret-key"
-```
-
-### 3. Setup Your App's Ingress
+### Setup Your App's Ingress
 
 ```yaml
 apiVersion: networking.k8s.io/v1
