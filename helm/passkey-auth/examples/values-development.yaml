@@ -1,0 +1,62 @@
+# Development values for passkey-auth
+# Use this for local development and testing
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/wahyd4/passkey-auth
+  tag: "main"
+  pullPolicy: Always
+
+# Application configuration
+config:
+  webauthn:
+    rpDisplayName: "Dev Passkey Auth"
+    rpId: "localhost"
+    rpOrigins:
+      - "http://localhost:8080"
+      - "https://auth.dev.local"
+
+  cors:
+    allowedOrigins:
+      - "*"  # Allow all origins in dev
+
+  auth:
+    requireApproval: false  # Auto-approve in dev
+    cookieDomain: ".dev.local"
+    allowedEmails: []  # Allow any email in dev
+
+# Security configuration (dev only)
+secrets:
+  sessionSecret: "dev-secret-not-for-production"
+
+# Disable ingress for local development
+ingress:
+  enabled: false
+
+# Minimal persistence for dev
+persistence:
+  enabled: true
+  size: 1Gi
+
+# Minimal resources for dev
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Disable autoscaling
+autoscaling:
+  enabled: false
+
+# Environment variables
+env:
+  - name: DEFAULT_EMAIL
+    value: "dev@example.com"
+  - name: CONFIG_PATH
+    value: "/app/config.yaml"
+  - name: ADMIN_EMAIL
+    value: "dev@example.com"

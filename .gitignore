@@ -5,7 +5,7 @@
 *.so
 *.dylib
 bin/
-passkey-auth
+./passkey-auth
 
 # Test binary, built with `go test -c`
 *.test
@@ -56,3 +56,6 @@ k8s/*-secret.yaml
 
 # Development files
 dev-*
+web/test.html
+
+*.log

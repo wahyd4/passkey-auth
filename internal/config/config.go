@@ -1,8 +1,9 @@
 package config
 
 import (
-	"io/ioutil"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -39,12 +40,20 @@ type AuthConfig struct {
 	SessionSecret   string   `yaml:"session_secret"`
 	RequireApproval bool     `yaml:"require_approval"`
 	AllowedEmails   []string `yaml:"allowed_emails"`
+	AdminEmail      string   `yaml:"admin_email"`
+	CookieDomain    string   `yaml:"cookie_domain"`
+	DefaultEmail    string   `yaml:"default_email"`
 }
 
 func Load() (*Config, error) {
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
 		configPath = "config.yaml"
+	}
+
+	// Validate config path to prevent path traversal attacks
+	if err := validateConfigPath(configPath); err != nil {
+		return nil, fmt.Errorf("invalid config path: %w", err)
 	}
 
 	// Set defaults
@@ -68,12 +77,14 @@ func Load() (*Config, error) {
 			SessionSecret:   "change-me-in-production",
 			RequireApproval: true,
 			AllowedEmails:   []string{}, // Empty means no email restrictions
+			CookieDomain:    "",         // Empty means no domain restriction (current domain only)
 		},
 	}
 
 	// Load from file if it exists
 	if _, err := os.Stat(configPath); err == nil {
-		data, err := ioutil.ReadFile(configPath)
+		// #nosec G304 - configPath is validated above to prevent path traversal
+		data, err := os.ReadFile(configPath)
 		if err != nil {
 			return nil, err
 		}
@@ -106,6 +117,15 @@ func Load() (*Config, error) {
 			config.Auth.AllowedEmails[i] = strings.TrimSpace(email)
 		}
 	}
+	if adminEmail := os.Getenv("ADMIN_EMAIL"); adminEmail != "" {
+		config.Auth.AdminEmail = adminEmail
+	}
+	if cookieDomain := os.Getenv("COOKIE_DOMAIN"); cookieDomain != "" {
+		config.Auth.CookieDomain = cookieDomain
+	}
+	if defaultEmail := os.Getenv("DEFAULT_EMAIL"); defaultEmail != "" {
+		config.Auth.DefaultEmail = defaultEmail
+	}
 
 	return config, nil
 }
@@ -126,4 +146,45 @@ func (c *Config) IsEmailAllowed(email string) bool {
 	}
 
 	return false
+}
+
+// IsAdmin checks if an email address is the admin email
+func (c *Config) IsAdmin(email string) bool {
+	return c.Auth.AdminEmail != "" && email == c.Auth.AdminEmail
+}
+
+// validateConfigPath ensures the config path is safe and doesn't allow path traversal
+func validateConfigPath(path string) error {
+	// Clean the path and check for path traversal attempts
+	cleanPath := filepath.Clean(path)
+
+	// Don't allow paths that try to go up directories
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("path traversal not allowed")
+	}
+
+	// Only allow certain file extensions
+	ext := filepath.Ext(cleanPath)
+	if ext != ".yaml" && ext != ".yml" {
+		return fmt.Errorf("only .yaml and .yml files are allowed")
+	}
+
+	// Convert to absolute path to check if it's within allowed directories
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Get current working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	// Only allow config files in current directory or its subdirectories
+	if !strings.HasPrefix(absPath, wd) {
+		return fmt.Errorf("config file must be in current directory or subdirectories")
+	}
+
+	return nil
 }

@@ -1,30 +1,38 @@
 # Build stage
-FROM golang:1.21-bullseye AS builder
+FROM golang:1.23-alpine AS builder
 
-# Install build dependencies including sqlite
-RUN apt-get update && apt-get install -y gcc libsqlite3-dev && rm -rf /var/lib/apt/lists/*
+# Install git for Go modules
+RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
 
-# Download dependencies
+# Download dependencies (this will be cached if go.mod/go.sum don't change)
 RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Build the application (remove static linking for SQLite compatibility)
-RUN CGO_ENABLED=1 GOOS=linux go build -a -o passkey-auth .
+# Build the application with optimized flags and build cache
+# Remove -a flag to avoid rebuilding standard library
+# Remove unnecessary static linking flags since CGO is disabled
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o passkey-auth .
 
 # Final stage
-FROM debian:bullseye-slim
+FROM alpine:latest
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y ca-certificates libsqlite3-0 && rm -rf /var/lib/apt/lists/*
+# Install ca-certificates for HTTPS (no sqlite library needed)
+RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+# Create a non-root user with UID 1000
+RUN adduser -D -u 1000 -g 1000 -s /bin/sh appuser
+
+# Set working directory
+WORKDIR /app
 
 # Copy the binary from builder stage
 COPY --from=builder /app/passkey-auth .
@@ -35,8 +43,11 @@ COPY --from=builder /app/web ./web/
 # Copy default config
 COPY --from=builder /app/config.yaml .
 
-# Create directory for database
-RUN mkdir -p /data
+# Create directory for database and set ownership
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8080

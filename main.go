@@ -5,13 +5,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 
 	"passkey-auth/internal/auth"
 	"passkey-auth/internal/config"
+	"passkey-auth/internal/cors"
 	"passkey-auth/internal/database"
 	"passkey-auth/internal/handlers"
 )
@@ -48,11 +49,13 @@ func main() {
 
 	// API routes
 	api := router.PathPrefix("/api").Subrouter()
+	api.HandleFunc("/config", h.GetConfig).Methods("GET")
 	api.HandleFunc("/register/begin", h.BeginRegistration).Methods("POST")
 	api.HandleFunc("/register/finish", h.FinishRegistration).Methods("POST")
 	api.HandleFunc("/login/begin", h.BeginLogin).Methods("POST")
 	api.HandleFunc("/login/finish", h.FinishLogin).Methods("POST")
 	api.HandleFunc("/logout", h.Logout).Methods("POST")
+	api.HandleFunc("/auth/status", h.GetAuthStatus).Methods("GET")
 	api.HandleFunc("/users", h.ListUsers).Methods("GET")
 	api.HandleFunc("/users", h.CreateUser).Methods("POST")
 	api.HandleFunc("/users/{id}", h.UpdateUser).Methods("PUT")
@@ -64,21 +67,23 @@ func main() {
 	// Health check
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"status": "healthy"}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 	}).Methods("GET")
 
 	// Static files for admin UI
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/"))).Methods("GET")
 
-	// Setup CORS
-	c := cors.New(cors.Options{
+	// Setup CORS with wildcard support
+	corsHandler := cors.WildcardCORS(cors.Config{
 		AllowedOrigins:   cfg.CORS.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
 
-	handler := c.Handler(router)
+	handler := corsHandler(router)
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -86,8 +91,17 @@ func main() {
 		port = "8080"
 	}
 
+	// Create server with proper timeouts to prevent resource exhaustion
+	server := &http.Server{
+		Addr:         ":" + port,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
 	logrus.Infof("Starting server on port %s", port)
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

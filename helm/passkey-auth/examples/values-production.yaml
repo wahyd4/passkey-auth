@@ -1,0 +1,122 @@
+# Production values for passkey-auth
+# Use this as a template for production deployments
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/wahyd4/passkey-auth
+  tag: "v1.0.0"  # Pin to specific version in production
+  pullPolicy: IfNotPresent
+
+# Application configuration
+config:
+  webauthn:
+    rpDisplayName: "My Company Passkey Auth"
+    rpId: "auth.company.com"  # CHANGE THIS
+    rpOrigins:
+      - "https://auth.company.com"  # CHANGE THIS
+
+  cors:
+    allowedOrigins:
+      - "https://*.company.com"  # CHANGE THIS
+      - "https://app.company.com"  # Add specific origins
+
+  auth:
+    requireApproval: true
+    cookieDomain: ".company.com"  # CHANGE THIS
+    allowedEmails:
+      - "admin@company.com"  # CHANGE THIS
+      - "user@company.com"   # Add allowed users
+
+# Security configuration
+secrets:
+  # Option 1: Create secret from values (less secure)
+  # sessionSecret: ""  # REQUIRED: Set this to a secure random string (32+ chars)
+
+  # Option 2: Use existing secret (recommended for production)
+  # Create the secret manually: kubectl create secret generic passkey-auth-secrets --from-literal=session-secret="your-secret-here"
+  existingSecret: "passkey-auth-secrets"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: auth.company.com  # CHANGE THIS
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: auth-company-com-tls
+      hosts:
+        - auth.company.com  # CHANGE THIS
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: "fast-ssd"  # Use fast storage for production
+  size: 5Gi
+  accessMode: ReadWriteOnce
+
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+# Health checks
+healthCheck:
+  enabled: true
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false  # SQLite needs write access
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node selection
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Environment variables
+env:
+  - name: DEFAULT_EMAIL
+    value: "admin@company.com"  # CHANGE THIS
+  - name: CONFIG_PATH
+    value: "/app/config.yaml"
+  - name: ADMIN_EMAIL
+    value: "admin@company.com"  # CHANGE THIS

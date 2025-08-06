@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>Passkey Auth</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        /* Minimal custom styles - let PicoCSS handle most styling */
+        .auth-toggle {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .link-btn {
+            background: none;
+            border: none;
+            color: var(--pico-primary);
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.9rem;
+            padding: 0;
+        }
+
+        .link-btn:hover {
+            opacity: 0.8;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--pico-border-radius);
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .status-approved {
+            background-color: var(--pico-ins-color);
+            color: var(--pico-ins-inverse);
+        }
+
+        .status-pending {
+            background-color: var(--pico-del-color);
+            color: var(--pico-del-inverse);
+        }
+
+        .user-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        /* Hide panels by default */
+        .welcome-panel, .admin-panel {
+            display: none;
+        }
+
+        /* Better spacing for main header */
+        body > main > header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        /* Improve form layout */
+        #authForm button[type="submit"] {
+            margin-top: 1rem;
+        }
+
+        /* Make login container smaller */
+        #authPanel article {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 576px) {
+            .user-actions {
+                justify-content: center;
+                margin-top: 1rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <hgroup>
+                <h1>🔐 Passkey Auth</h1>
+                <p id="headerSubtitle">Secure passwordless authentication</p>
+            </hgroup>
+            <nav>
+                <ul>
+                    <li></li>
+                </ul>
+                <ul>
+                    <li>
+                        <details class="dropdown">
+                            <summary>Theme</summary>
+                            <ul>
+                                <li><a href="#" onclick="setTheme('auto')">Auto</a></li>
+                                <li><a href="#" onclick="setTheme('light')">Light</a></li>
+                                <li><a href="#" onclick="setTheme('dark')">Dark</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                </ul>
+            </nav>
+        </header>
+
+        <!-- Authentication Section -->
+        <section id="authPanel" class="auth-panel">
+            <article>
+                <form id="authForm">
+                    <label for="email">
+                        Email address
+                        <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+                    </label>
+
+                    <button type="submit" id="authSubmitBtn">
+                        Sign in with passkey
+                    </button>
+                </form>
+
+                <footer class="auth-toggle">
+                    <button type="button" class="link-btn" id="toggleModeBtn">
+                        Don't have an account? Create one
+                    </button>
+                </footer>
+            </article>
+        </section>
+
+        <!-- Welcome Section -->
+        <section id="welcomePanel" class="welcome-panel">
+            <article>
+                <header>
+                    <h2>Welcome back!</h2>
+                    <p>You're successfully authenticated</p>
+                </header>
+
+                <div id="welcomeMessage"></div>
+
+                <footer>
+                    <button type="button" class="secondary" id="logoutBtn">
+                        Sign out
+                    </button>
+                </footer>
+            </article>
+        </section>
+
+        <!-- Admin Panel -->
+        <section id="adminPanel" class="admin-panel">
+            <article>
+                <header>
+                    <h3>User Management</h3>
+                    <p>Manage user accounts and permissions</p>
+                </header>
+
+                <button onclick="loadUsers()" class="outline">
+                    Refresh users
+                </button>
+
+                <div id="usersList" class="users-list">
+                    <article aria-busy="true">Loading users...</article>
+                </div>
+            </article>
+        </section>
+
+        <!-- Alerts Container -->
+        <div id="alerts"></div>
+    </main>
+
+    <script>
+        // Theme management
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('pico-theme', theme);
+        }
+
+        // Load saved theme or use auto
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('pico-theme') || 'auto';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
+        // Base64/Base64URL decoding functions for WebAuthn
+        function base64ToArrayBuffer(base64) {
+            if (!base64 || typeof base64 !== 'string') {
+                console.error('Invalid base64 input:', base64);
+                throw new Error('Invalid base64 input');
+            }
+
+            console.log('Converting base64 to ArrayBuffer:', base64);
+
+            try {
+                // If it looks like base64url, convert to base64 first
+                let base64String = base64;
+                if (base64.includes('-') || base64.includes('_')) {
+                    // This is base64url, convert to base64
+                    base64String = base64.replace(/-/g, '+').replace(/_/g, '/');
+                    // Add padding if needed
+                    const padding = base64String.length % 4;
+                    if (padding) {
+                        base64String += '='.repeat(4 - padding);
+                    }
+                } else {
+                    // This is standard base64, add padding if needed
+                    const padding = base64String.length % 4;
+                    if (padding) {
+                        base64String += '='.repeat(4 - padding);
+                    }
+                }
+
+                // Decode base64
+                const binary = atob(base64String);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                console.log('Converted to ArrayBuffer, length:', bytes.buffer.byteLength);
+                return bytes.buffer;
+            } catch (error) {
+                console.error('Error converting base64 to ArrayBuffer:', error);
+                throw error;
+            }
+        }
+
+        // For backwards compatibility, keep the old function name but make it handle both
+        function base64urlToArrayBuffer(base64url) {
+            return base64ToArrayBuffer(base64url);
+        }
+
+        // Utility function to extract error message from response
+        function extractErrorMessage(responseText, defaultMessage = 'An error occurred') {
+            let errorMessage = responseText;
+            try {
+                const errorJson = JSON.parse(responseText);
+                if (errorJson.error) {
+                    errorMessage = errorJson.error;
+                }
+            } catch (e) {
+                // If parsing fails, check if it's already a plain text message
+                if (responseText && responseText.trim() !== '') {
+                    errorMessage = responseText;
+                } else {
+                    errorMessage = defaultMessage;
+                }
+            }
+            return errorMessage;
+        }
+
+        // Redirect handling for nginx auth_request
+        function getRedirectUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            // Check for both 'redirect' and 'rd' parameters (nginx uses 'rd' by default)
+            // Prefer 'redirect' over 'rd' if both are present
+            const redirectParam = urlParams.get('redirect');
+            const rdParam = urlParams.get('rd');
+
+            console.log('URL params:', {
+                redirect: redirectParam,
+                rd: rdParam,
+                search: window.location.search
+            });
+
+            return redirectParam || rdParam;
+        }
+
+        // Extract email parameter from URL
+        function getEmailFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailParam = urlParams.get('email');
+
+            return emailParam;
+        }
+
+        // Pre-fill email input if email parameter exists or from config
+        function prefillEmail() {
+            const email = getEmailFromUrl();
+            if (email) {
+                const emailInput = document.getElementById('email');
+                if (emailInput) {
+                    emailInput.value = decodeURIComponent(email);
+                }
+            } else {
+                // If no email parameter, try to get default email from config
+                loadDefaultEmail();
+            }
+        }
+
+        // Load default email from server configuration
+        async function loadDefaultEmail() {
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    if (config.default_email) {
+                        const emailInput = document.getElementById('email');
+                        if (emailInput && !emailInput.value) {
+                            emailInput.value = config.default_email;
+                            console.log('Pre-filled email from config:', config.default_email);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log('Could not load default email from config:', error);
+                // Fail silently - this is not critical functionality
+            }
+        }
+
+        function redirectAfterAuth() {
+            const redirectUrl = getRedirectUrl();
+            console.log('Checking for redirect URL:', redirectUrl);
+            if (redirectUrl) {
+                try {
+                    // Decode the URL if it's encoded
+                    const decodedUrl = decodeURIComponent(redirectUrl);
+                    console.log('Decoded redirect URL:', decodedUrl);
+
+                    // Validate the URL
+                    const url = new URL(decodedUrl);
+                    console.log('Parsed URL:', url.href);
+
+                    // Show a brief message before redirecting
+                    showAlert(`Redirecting to ${url.hostname}...`, 'success');
+
+                    setTimeout(() => {
+                        console.log('Executing redirect to:', decodedUrl);
+                        window.location.href = decodedUrl;
+                    }, 1500);
+                    return true;
+                } catch (error) {
+                    console.error('Error processing redirect URL:', error);
+                    showAlert('Invalid redirect URL', 'error');
+                }
+            } else {
+                console.log('No redirect URL found');
+            }
+            return false;
+        }
+
+        function arrayBufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+            return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }        // Convert WebAuthn options from base64url to ArrayBuffer
+        function prepareWebAuthnOptions(options) {
+            console.log('prepareWebAuthnOptions called with:', options);
+
+            // Handle both registration and login options (both use publicKey wrapper)
+            if (options.publicKey) {
+                console.log('Processing WebAuthn options (has publicKey)');
+                const publicKey = { ...options.publicKey };
+
+                // Convert challenge (common to both registration and login)
+                if (publicKey.challenge) {
+                    console.log('Original challenge:', publicKey.challenge, 'type:', typeof publicKey.challenge);
+                    if (typeof publicKey.challenge === 'string') {
+                        publicKey.challenge = base64ToArrayBuffer(publicKey.challenge);
+                        console.log('Converted challenge to ArrayBuffer, byteLength:', publicKey.challenge.byteLength);
+                    } else {
+                        console.error('Challenge is not a string:', publicKey.challenge);
+                        throw new Error('Challenge must be a base64 or base64url string');
+                    }
+                }
+
+                // Convert user ID (registration only)
+                if (publicKey.user && publicKey.user.id) {
+                    console.log('Original user ID:', publicKey.user.id, 'type:', typeof publicKey.user.id);
+                    if (typeof publicKey.user.id === 'string') {
+                        publicKey.user.id = base64ToArrayBuffer(publicKey.user.id);
+                        console.log('Converted user ID to ArrayBuffer, byteLength:', publicKey.user.id.byteLength);
+                    } else {
+                        console.error('User ID is not a string:', publicKey.user.id);
+                        throw new Error('User ID must be a base64 or base64url string');
+                    }
+                }
+
+                // Convert excludeCredentials (registration)
+                if (publicKey.excludeCredentials) {
+                    console.log('Converting excludeCredentials for registration');
+                    publicKey.excludeCredentials = publicKey.excludeCredentials.map(cred => ({
+                        ...cred,
+                        id: base64ToArrayBuffer(cred.id)
+                    }));
+                }
+
+                // Convert allowCredentials (login/authentication)
+                if (publicKey.allowCredentials) {
+                    console.log('Converting allowCredentials for login:', publicKey.allowCredentials);
+                    publicKey.allowCredentials = publicKey.allowCredentials.map(cred => {
+                        console.log('Converting credential ID:', cred.id, 'type:', typeof cred.id);
+                        return {
+                            ...cred,
+                            id: base64ToArrayBuffer(cred.id)
+                        };
+                    });
+                    console.log('Converted allowCredentials:', publicKey.allowCredentials);
+                }
+
+                const result = { publicKey };
+                console.log('Returning prepared WebAuthn options:', result);
+                return result;
+            }
+
+            console.log('No publicKey property found, returning as-is');
+            return options;
+        }
+
+        // Convert WebAuthn response from ArrayBuffer to base64url
+        function prepareWebAuthnResponse(credential) {
+            console.log('prepareWebAuthnResponse input:', credential);
+
+            const response = {
+                id: '',
+                rawId: '',
+                type: credential.type || 'public-key',
+                response: {}
+            };
+
+            // Convert credential ID
+            if (credential.rawId) {
+                const credentialId = arrayBufferToBase64url(credential.rawId);
+                response.id = credentialId;
+                response.rawId = credentialId;
+                console.log('Converted credential ID:', credentialId);
+            } else if (credential.id) {
+                // Some browsers might provide id as string already
+                response.id = credential.id;
+                response.rawId = credential.id;
+                console.log('Using existing credential ID:', credential.id);
+            }
+
+            // Convert response data
+            if (credential.response) {
+                console.log('Processing credential.response:', credential.response);
+
+                if (credential.response.clientDataJSON) {
+                    response.response.clientDataJSON = arrayBufferToBase64url(credential.response.clientDataJSON);
+                    console.log('Converted clientDataJSON');
+                }
+
+                // For registration (attestationObject)
+                if (credential.response.attestationObject) {
+                    response.response.attestationObject = arrayBufferToBase64url(credential.response.attestationObject);
+                    console.log('Converted attestationObject');
+                }
+
+                // For authentication (authenticatorData, signature)
+                if (credential.response.authenticatorData) {
+                    response.response.authenticatorData = arrayBufferToBase64url(credential.response.authenticatorData);
+                    console.log('Converted authenticatorData');
+                }
+
+                if (credential.response.signature) {
+                    response.response.signature = arrayBufferToBase64url(credential.response.signature);
+                    console.log('Converted signature');
+                }
+
+                if (credential.response.userHandle) {
+                    response.response.userHandle = arrayBufferToBase64url(credential.response.userHandle);
+                    console.log('Converted userHandle');
+                }
+            }
+
+            console.log('Final prepared response:', response);
+            return response;
+        }
+
+        // UI State Management
+        let isSignUpMode = false;
+        let currentUser = null;
+
+        // Tab functionality
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+
+            // Load users when users tab is selected
+            if (tabName === 'users') {
+                loadUsers();
+            }
+        }
+
+        // UI State Functions
+        function showAuthPanel() {
+            document.getElementById('authPanel').style.display = 'block';
+            document.getElementById('welcomePanel').style.display = 'none';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('headerSubtitle').textContent = 'Secure passwordless authentication';
+        }
+
+        function showWelcomePanel(user) {
+            document.getElementById('authPanel').style.display = 'none';
+            document.getElementById('welcomePanel').style.display = 'block';
+            document.getElementById('headerSubtitle').textContent = 'Dashboard';
+
+            const welcomeMessage = document.getElementById('welcomeMessage');
+            welcomeMessage.innerHTML = `
+                <p>Hello, <strong>${user.display_name}</strong>! You're successfully authenticated and ready to go.</p>
+
+                <details>
+                    <summary>Account Information</summary>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td><strong>Name</strong></td>
+                                <td>${user.display_name}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Email</strong></td>
+                                <td>${user.email}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Role</strong></td>
+                                <td>${user.is_admin ? '<span class="status-badge status-approved">Administrator</span>' : '<span class="status-badge">User</span>'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </details>
+            `;
+
+            // Show admin panel if user is admin
+            if (user.is_admin) {
+                document.getElementById('adminPanel').style.display = 'block';
+                loadUsers();
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+            }
+        }
+
+        function toggleSignUpMode() {
+            isSignUpMode = !isSignUpMode;
+            const authSubmitBtn = document.getElementById('authSubmitBtn');
+            const toggleModeBtn = document.getElementById('toggleModeBtn');
+
+            if (isSignUpMode) {
+                authSubmitBtn.textContent = 'Create account with passkey';
+                toggleModeBtn.textContent = 'Already have an account? Sign in';
+            } else {
+                authSubmitBtn.textContent = 'Sign in with passkey';
+                toggleModeBtn.textContent = "Don't have an account? Create one";
+            }
+        }
+
+        function logout() {
+            fetch('/api/logout', {
+                method: 'POST',
+                credentials: 'include'
+            }).then(() => {
+                currentUser = null;
+                showAuthPanel();
+                showAlert('You have been signed out successfully');
+                // Clear email input
+                document.getElementById('email').value = '';
+            }).catch(error => {
+                showAlert('Sign out failed: ' + error.message, 'error');
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('toggleModeBtn').addEventListener('click', toggleSignUpMode);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
+        // Alert functions
+        function showAlert(message, type = 'success') {
+            const alertsContainer = document.getElementById('alerts');
+            const alert = document.createElement('article');
+
+            // Use appropriate styling based on type
+            if (type === 'success') {
+                alert.style.borderLeftColor = 'var(--pico-ins-color)';
+                alert.style.borderLeftWidth = '4px';
+                alert.style.borderLeftStyle = 'solid';
+                alert.innerHTML = `<strong>Success:</strong> ${message}`;
+            } else {
+                alert.style.borderLeftColor = 'var(--pico-del-color)';
+                alert.style.borderLeftWidth = '4px';
+                alert.style.borderLeftStyle = 'solid';
+                alert.innerHTML = `<strong>Error:</strong> ${message}`;
+            }
+
+            alertsContainer.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Authentication status management
+        async function checkAuthStatus() {
+            try {
+                console.log('Checking authentication status...');
+                const response = await fetch('/api/auth/status', {
+                    credentials: 'include'
+                });
+
+                console.log('Auth status response:', response.status, response.statusText);
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    console.log('User is authenticated:', userData);
+                    currentUser = userData.user;
+                    showWelcomePanel(userData.user);
+                    return userData;
+                } else {
+                    console.log('User is not authenticated');
+                    currentUser = null;
+                    showAuthPanel();
+                    return null;
+                }
+            } catch (error) {
+                console.log('Auth status check failed:', error);
+                currentUser = null;
+                showAuthPanel();
+                return null;
+            }
+        }
+
+        function showUsersTab() {
+            console.log('showUsersTab called');
+            const usersTab = document.getElementById('usersTab');
+            if (usersTab) {
+                usersTab.style.display = 'block';
+                console.log('Users tab is now visible');
+            } else {
+                console.log('Could not find usersTab element');
+            }
+        }
+
+        function hideUsersTab() {
+            console.log('hideUsersTab called');
+            const usersTab = document.getElementById('usersTab');
+            const usersContent = document.getElementById('users');
+
+            if (usersTab) {
+                usersTab.style.display = 'none';
+                console.log('Users tab is now hidden');
+            }
+
+            // If users tab is currently active, switch to register tab
+            if (usersContent && usersContent.classList.contains('active')) {
+                console.log('Users tab was active, switching to register tab');
+                showTab('register');
+            }
+        }        // Unified Auth Form Handler
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const submitBtn = document.getElementById('authSubmitBtn');
+
+            // Disable submit button during processing
+            submitBtn.disabled = true;
+            submitBtn.setAttribute('aria-busy', 'true');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = isSignUpMode ?
+                'Creating account...' :
+                'Signing in...';
+
+            try {
+                if (isSignUpMode) {
+                    await handleSignUp(email);
+                } else {
+                    await handleSignIn(email);
+                }
+            } catch (error) {
+                showAlert(`${isSignUpMode ? 'Account creation' : 'Sign in'} failed: ${error.message}`, 'error');
+            } finally {
+                // Re-enable submit button
+                submitBtn.disabled = false;
+                submitBtn.removeAttribute('aria-busy');
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        // Sign Up Handler
+        async function handleSignUp(email) {
+            console.log('Starting registration for email:', email);
+
+            // Use email as display name (extract name part before @)
+            const displayName = email.split('@')[0];
+
+            // Begin registration
+            const beginResponse = await fetch('/api/register/begin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    display_name: displayName
+                }),
+                credentials: 'include'
+            });
+
+            if (!beginResponse.ok) {
+                const errorText = await beginResponse.text();
+                throw new Error(extractErrorMessage(errorText, 'Registration failed'));
+            }
+
+            const options = await beginResponse.json();
+            console.log('Raw options from server:', JSON.stringify(options, null, 2));
+
+            // Convert base64url encoded fields to ArrayBuffers
+            const webAuthnOptions = prepareWebAuthnOptions(options);
+            console.log('Final webAuthnOptions for navigator.credentials.create:', webAuthnOptions);
+
+            // Create credential
+            const credential = await navigator.credentials.create(webAuthnOptions);
+            console.log('Raw credential from navigator.credentials.create:', credential);
+
+            // Convert ArrayBuffers back to base64url for JSON
+            const credentialResponse = prepareWebAuthnResponse(credential);
+            console.log('Prepared credential response to send to server:', JSON.stringify(credentialResponse, null, 2));
+
+            // Finish registration
+            const finishResponse = await fetch('/api/register/finish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentialResponse),
+                credentials: 'include'
+            });
+
+            console.log('Finish registration response status:', finishResponse.status);
+            if (!finishResponse.ok) {
+                const errorText = await finishResponse.text();
+                console.error('Finish registration error:', errorText);
+                throw new Error(extractErrorMessage(errorText, 'Registration completion failed'));
+            }
+
+            showAlert('Account created successfully! Welcome to the platform.');
+
+            // Check for redirect first, then fall back to checking auth status
+            if (!redirectAfterAuth()) {
+                // Check auth status to show welcome panel
+                setTimeout(checkAuthStatus, 100);
+            }
+        }
+
+        // Sign In Handler
+        async function handleSignIn(email) {
+            // Begin login
+            const beginResponse = await fetch('/api/login/begin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email
+                }),
+                credentials: 'include'
+            });
+
+            if (!beginResponse.ok) {
+                const errorText = await beginResponse.text();
+                throw new Error(extractErrorMessage(errorText, 'Sign in failed'));
+            }
+
+            const options = await beginResponse.json();
+            console.log('Raw login options from server:', JSON.stringify(options, null, 2));
+
+            // Convert base64url encoded fields to ArrayBuffers
+            const webAuthnOptions = prepareWebAuthnOptions(options);
+            console.log('Final login webAuthnOptions for navigator.credentials.get:', webAuthnOptions);
+
+            // Get credential
+            const credential = await navigator.credentials.get(webAuthnOptions);
+
+            // Convert ArrayBuffers back to base64url for JSON
+            const credentialResponse = prepareWebAuthnResponse(credential);
+
+            // Finish login
+            const finishResponse = await fetch('/api/login/finish', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(credentialResponse),
+                credentials: 'include'
+            });
+
+            if (!finishResponse.ok) {
+                const errorText = await finishResponse.text();
+                throw new Error(extractErrorMessage(errorText, 'Authentication failed'));
+            }
+
+            const result = await finishResponse.json();
+            showAlert(`Welcome back, ${result.user.display_name}!`);
+
+            // Check for redirect first, then fall back to checking auth status
+            if (!redirectAfterAuth()) {
+                // Check auth status to show welcome panel
+                setTimeout(checkAuthStatus, 100);
+            }
+        }
+
+        // Users management
+        async function loadUsers() {
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = '<article aria-busy="true">Loading users...</article>';
+
+            try {
+                const response = await fetch('/api/users', {
+                    credentials: 'include'
+                });
+
+                if (response.status === 403) {
+                    // User is not admin, hide the tab
+                    hideUsersTab();
+                    showAlert('Access denied: Administrator privileges required', 'error');
+                    return;
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(extractErrorMessage(errorText, 'Failed to load users'));
+                }
+
+                const users = await response.json();
+
+                if (users.length === 0) {
+                    usersList.innerHTML = '<p>No users found.</p>';
+                    return;
+                }
+
+                usersList.innerHTML = users.map(user => `
+                    <article>
+                        <header>
+                            <h4>${user.display_name}</h4>
+                            <p>${user.email}</p>
+                        </header>
+
+                        <p><small>Created: ${new Date(user.created_at).toLocaleDateString()}</small></p>
+
+                        <footer class="user-actions">
+                            <span class="status-badge ${user.approved ? 'status-approved' : 'status-pending'}">
+                                ${user.approved ? 'Approved' : 'Pending Approval'}
+                            </span>
+                            ${!user.approved ? `<button class="outline" onclick="approveUser(${user.id})">Approve User</button>` : ''}
+                            <button class="secondary" onclick="deleteUser(${user.id})">Delete User</button>
+                        </footer>
+                    </article>
+                `).join('');
+            } catch (error) {
+                usersList.innerHTML = `<article><mark>Failed to load users: ${error.message}</mark></article>`;
+            }
+        }
+
+        async function approveUser(userId) {
+            if (!confirm('Are you sure you want to approve this user?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        approved: true
+                    }),
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(extractErrorMessage(errorText, 'Failed to approve user'));
+                }
+
+                showAlert('User approved successfully');
+                loadUsers(); // Refresh the users list
+            } catch (error) {
+                showAlert(`Failed to approve user: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(extractErrorMessage(errorText, 'Failed to delete user'));
+                }
+
+                showAlert('User deleted successfully');
+                loadUsers();
+            } catch (error) {
+                showAlert(`Failed to delete user: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load theme first
+            loadTheme();
+
+            // Pre-fill email if provided in URL parameters
+            prefillEmail();
+
+            // Check if there's a redirect URL and update header
+            const redirectUrl = getRedirectUrl();
+            if (redirectUrl) {
+                try {
+                    const decodedUrl = decodeURIComponent(redirectUrl);
+                    const targetDomain = new URL(decodedUrl).hostname;
+                    document.getElementById('headerSubtitle').textContent = `Authenticating for ${targetDomain}`;
+                } catch (error) {
+                    document.getElementById('headerSubtitle').textContent = 'Authenticating for protected resource';
+                }
+            }
+
+            // Check authentication status to determine initial UI state
+            const user = await checkAuthStatus();
+
+            // If user is already authenticated and there's a redirect parameter, redirect immediately
+            if (user && redirectUrl) {
+                setTimeout(() => redirectAfterAuth(), 1000); // Give user a moment to see the message
+            }
+        });
+    </script>
+</body>
+</html>

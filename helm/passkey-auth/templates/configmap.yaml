@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "passkey-auth.configmapName" . }}
+  labels:
+    {{- include "passkey-auth.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    server:
+      port: {{ .Values.config.server.port | quote }}
+      host: {{ .Values.config.server.host | quote }}
+
+    webauthn:
+      rp_display_name: {{ .Values.config.webauthn.rpDisplayName | quote }}
+      rp_id: {{ .Values.config.webauthn.rpId | quote }}
+      rp_origins:
+        {{- range .Values.config.webauthn.rpOrigins }}
+        - {{ . | quote }}
+        {{- end }}
+
+    database:
+      path: {{ .Values.config.database.path | quote }}
+
+    cors:
+      allowed_origins:
+        {{- range .Values.config.cors.allowedOrigins }}
+        - {{ . | quote }}
+        {{- end }}
+
+    auth:
+      require_approval: {{ .Values.config.auth.requireApproval }}
+      cookie_domain: {{ .Values.config.auth.cookieDomain | quote }}
+      {{- if .Values.config.auth.allowedEmails }}
+      allowed_emails:
+        {{- range .Values.config.auth.allowedEmails }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}

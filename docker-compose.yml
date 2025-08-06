@@ -9,9 +9,11 @@ services:
       - WEBAUTHN_RP_ID=localhost
       - DATABASE_PATH=/data/passkey-auth.db
       - SESSION_SECRET=dev-secret-change-in-production
+      - ADMIN_EMAIL=admin@example.com
+      - DEFAULT_EMAIL=admin@example.com
     volumes:
       - ./data:/data
-      - ./config.yaml:/root/config.yaml
+      - ./config.yaml:/app/config.yaml
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]

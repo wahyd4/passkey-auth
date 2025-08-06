@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ func New(db *database.DB, webAuthn *auth.WebAuthn, config *config.Config) *Handl
 		HttpOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
+		Domain:   config.Auth.CookieDomain, // Share cookies across subdomains if configured
 	}
 
 	return &Handlers{
@@ -47,12 +49,19 @@ func New(db *database.DB, webAuthn *auth.WebAuthn, config *config.Config) *Handl
 func (h *Handlers) writeError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		// If we can't encode the error response, log it
+		// Don't try to write another response as headers are already sent
+		log.Printf("Failed to encode error response: %v", err)
+	}
 }
 
 func (h *Handlers) writeJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		// If encoding fails, try to send a simple error response
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 // BeginRegistration starts the passkey registration process
@@ -85,16 +94,16 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create new user
-	user, err := h.db.CreateUser(req.Email, req.DisplayName)
-	if err != nil {
-		logrus.Errorf("Failed to create user: %v", err)
-		h.writeError(w, "Failed to create user", http.StatusInternalServerError)
-		return
+	// Create a temporary WebAuthn user for registration without saving to DB yet
+	isAdmin := h.config.IsAdmin(req.Email)
+	tempUser := &database.User{
+		Email:       req.Email,
+		DisplayName: req.DisplayName,
+		Approved:    isAdmin, // Auto-approve admins
 	}
 
 	webAuthnUser := &auth.WebAuthnUser{}
-	webAuthnUser.SetUser(user)
+	webAuthnUser.SetUser(tempUser)
 
 	options, sessionData, err := h.webAuthn.BeginRegistration(webAuthnUser)
 	if err != nil {
@@ -103,11 +112,16 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store session data
+	// Store session data with user details for later creation
 	session, _ := h.store.Get(r, "webauthn-session")
 	session.Values["challenge"] = sessionData.Challenge
-	session.Values["user_id"] = user.ID
-	session.Save(r, w)
+	session.Values["pending_email"] = req.Email
+	session.Values["pending_display_name"] = req.DisplayName
+	session.Values["pending_is_admin"] = isAdmin
+	if err := session.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
 
 	// Debug: log the options structure
 	logrus.Debugf("WebAuthn options: %+v", options)
@@ -123,15 +137,28 @@ func (h *Handlers) BeginRegistration(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	session, _ := h.store.Get(r, "webauthn-session")
 
-	userID, ok := session.Values["user_id"].(int)
+	// Get pending user data from session instead of user_id
+	pendingEmail, ok := session.Values["pending_email"].(string)
 	if !ok {
-		h.writeError(w, "Invalid session", http.StatusBadRequest)
+		h.writeError(w, "Invalid session - no pending registration", http.StatusBadRequest)
+		return
+	}
+
+	pendingDisplayName, ok := session.Values["pending_display_name"].(string)
+	if !ok {
+		h.writeError(w, "Invalid session - missing display name", http.StatusBadRequest)
+		return
+	}
+
+	pendingIsAdmin, ok := session.Values["pending_is_admin"].(bool)
+	if !ok {
+		h.writeError(w, "Invalid session - missing admin flag", http.StatusBadRequest)
 		return
 	}
 
 	challenge, ok := session.Values["challenge"].(string)
 	if !ok {
-		h.writeError(w, "Invalid session", http.StatusBadRequest)
+		h.writeError(w, "Invalid session - missing challenge", http.StatusBadRequest)
 		return
 	}
 
@@ -146,14 +173,15 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	// Create a new reader from the body for the WebAuthn library
 	r.Body = io.NopCloser(strings.NewReader(string(body)))
 
-	user, err := h.db.GetUser(userID)
-	if err != nil {
-		h.writeError(w, "User not found", http.StatusNotFound)
-		return
+	// Create temporary user for WebAuthn verification
+	tempUser := &database.User{
+		Email:       pendingEmail,
+		DisplayName: pendingDisplayName,
+		Approved:    pendingIsAdmin,
 	}
 
 	webAuthnUser := &auth.WebAuthnUser{}
-	webAuthnUser.SetUser(user)
+	webAuthnUser.SetUser(tempUser)
 
 	sessionData := webauthn.SessionData{
 		Challenge: challenge,
@@ -161,7 +189,7 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the request details for debugging
-	logrus.Debugf("Finishing registration for user: %s", user.Email)
+	logrus.Debugf("Finishing registration for user: %s", pendingEmail)
 	logrus.Debugf("Session challenge: %s", challenge)
 	logrus.Debugf("Session user ID: %v", webAuthnUser.WebAuthnID())
 
@@ -172,17 +200,52 @@ func (h *Handlers) FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only NOW create the user in the database after successful passkey registration
+	user, err := h.db.CreateUserWithApproval(pendingEmail, pendingDisplayName, pendingIsAdmin)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			h.writeError(w, "User already exists", http.StatusConflict)
+			return
+		}
+		logrus.Errorf("Failed to create user: %v", err)
+		h.writeError(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	if pendingIsAdmin {
+		logrus.Infof("Admin user auto-approved: %s", pendingEmail)
+	}
+
 	// Save credential to database
 	if err := h.webAuthn.SaveCredential(user.ID, credential); err != nil {
 		logrus.Errorf("Failed to save credential: %v", err)
+		// If we can't save the credential, we should remove the user we just created
+		if deleteErr := h.db.DeleteUser(user.ID); deleteErr != nil {
+			logrus.Errorf("Failed to cleanup user after credential save failure: %v", deleteErr)
+		}
 		h.writeError(w, "Failed to save credential", http.StatusInternalServerError)
 		return
 	}
 
-	// Clear session
+	// Set authenticated session after successful registration
+	authSession, _ := h.store.Get(r, "auth-session")
+	authSession.Values["authenticated"] = true
+	authSession.Values["user_id"] = user.ID
+	authSession.Values["user_email"] = user.Email
+	if err := authSession.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save auth session", http.StatusInternalServerError)
+		return
+	}
+
+	// Clear webauthn session
 	session.Values["challenge"] = nil
-	session.Values["user_id"] = nil
-	session.Save(r, w)
+	session.Values["pending_email"] = nil
+	session.Values["pending_display_name"] = nil
+	session.Values["pending_is_admin"] = nil
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session: %v", err)
+		// Don't return error here as the main operation succeeded
+	}
 
 	h.writeJSON(w, map[string]string{"status": "success"})
 }
@@ -233,7 +296,10 @@ func (h *Handlers) BeginLogin(w http.ResponseWriter, r *http.Request) {
 	session, _ := h.store.Get(r, "webauthn-session")
 	session.Values["challenge"] = sessionData.Challenge
 	session.Values["user_id"] = webAuthnUser.GetUser().ID
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save session", http.StatusInternalServerError)
+		return
+	}
 
 	h.writeJSON(w, options)
 }
@@ -288,12 +354,18 @@ func (h *Handlers) FinishLogin(w http.ResponseWriter, r *http.Request) {
 	authSession.Values["authenticated"] = true
 	authSession.Values["user_id"] = user.ID
 	authSession.Values["user_email"] = user.Email
-	authSession.Save(r, w)
+	if err := authSession.Save(r, w); err != nil {
+		h.writeError(w, "Failed to save auth session", http.StatusInternalServerError)
+		return
+	}
 
 	// Clear webauthn session
 	session.Values["challenge"] = nil
 	session.Values["user_id"] = nil
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session: %v", err)
+		// Don't return error here as the main operation succeeded
+	}
 
 	h.writeJSON(w, map[string]interface{}{
 		"status": "success",
@@ -312,17 +384,34 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	session.Values["user_id"] = nil
 	session.Values["user_email"] = nil
 	session.Options.MaxAge = -1
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		log.Printf("Failed to save session during logout: %v", err)
+		// Don't return error here as logout should still succeed
+	}
 
 	h.writeJSON(w, map[string]string{"status": "success"})
 }
 
 // AuthCheck implements the nginx auth_request protocol
 func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
-	session, _ := h.store.Get(r, "auth-session")
+	// Debug logging
+	logrus.Debugf("AuthCheck request from %s", r.RemoteAddr)
+	logrus.Debugf("AuthCheck headers: %+v", r.Header)
+	logrus.Debugf("AuthCheck cookies: %+v", r.Cookies())
+
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		logrus.Errorf("Failed to get auth session: %v", err)
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	authenticated, ok := session.Values["authenticated"].(bool)
+	logrus.Debugf("Session authenticated: %v, ok: %v", authenticated, ok)
+	logrus.Debugf("Session values: %+v", session.Values)
+
 	if !ok || !authenticated {
+		logrus.Debugf("User not authenticated, returning 401")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -335,14 +424,67 @@ func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Auth-User", userEmail)
 	}
 
+	logrus.Debugf("User authenticated, returning 200")
 	w.WriteHeader(http.StatusOK)
+}
+
+// GetAuthStatus returns the current authentication status
+func (h *Handlers) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		h.writeError(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	userEmail, ok := session.Values["user_email"].(string)
+	if !ok || userEmail == "" {
+		h.writeError(w, "Not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Get user details from database
+	user, err := h.db.GetUserByEmail(userEmail)
+	if err != nil {
+		h.writeError(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user is approved
+	if !user.Approved {
+		h.writeError(w, "User not approved", http.StatusForbidden)
+		return
+	}
+
+	response := map[string]interface{}{
+		"authenticated": true,
+		"user": map[string]interface{}{
+			"id":           user.ID,
+			"email":        user.Email,
+			"display_name": user.DisplayName,
+			"approved":     user.Approved,
+			"is_admin":     h.config.IsAdmin(user.Email),
+		},
+	}
+
+	h.writeJSON(w, response)
+}
+
+// GetConfig returns public configuration data
+func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
+	configData := map[string]interface{}{
+		"default_email": h.config.Auth.DefaultEmail,
+	}
+	h.writeJSON(w, configData)
 }
 
 // Admin endpoints
 
 // ListUsers returns all users (admin endpoint)
 func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+
 	users, err := h.db.ListUsers()
 	if err != nil {
 		logrus.Errorf("Failed to list users: %v", err)
@@ -355,7 +497,10 @@ func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 // CreateUser creates a new user (admin endpoint)
 func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+
 	var req struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"display_name"`
@@ -373,7 +518,7 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.db.CreateUser(req.Email, req.DisplayName)
+	user, err := h.db.CreateUserWithApproval(req.Email, req.DisplayName, req.Approved)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			h.writeError(w, "User already exists", http.StatusConflict)
@@ -384,18 +529,15 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Approved {
-		if err := h.db.ApproveUser(user.ID); err != nil {
-			logrus.Errorf("Failed to approve user: %v", err)
-		}
-	}
-
 	h.writeJSON(w, user)
 }
 
 // UpdateUser updates a user (admin endpoint)
 func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok {
@@ -441,7 +583,10 @@ func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 // DeleteUser deletes a user (admin endpoint)
 func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add admin authentication check
+	if !h.requireAdmin(w, r) {
+		return
+	}
+
 	vars := mux.Vars(r)
 	idStr, ok := vars["id"]
 	if !ok {
@@ -462,4 +607,26 @@ func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, map[string]string{"status": "success"})
+}
+
+func (h *Handlers) isAdmin(r *http.Request) bool {
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		return false
+	}
+
+	userEmail, ok := session.Values["user_email"].(string)
+	if !ok {
+		return false
+	}
+
+	return h.config.IsAdmin(userEmail)
+}
+
+func (h *Handlers) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	if !h.isAdmin(r) {
+		h.writeError(w, "Admin access required", http.StatusForbidden)
+		return false
+	}
+	return true
 }
