@@ -392,32 +392,29 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, map[string]string{"status": "success"})
 }
 
-// AuthCheck implements auth backend for both nginx auth_request and Traefik ForwardAuth
-func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
-	// Debug logging
-	logrus.Debugf("AuthCheck request from %s", r.RemoteAddr)
-	logrus.Debugf("AuthCheck headers: %+v", r.Header)
-	logrus.Debugf("AuthCheck cookies: %+v", r.Cookies())
-	logrus.Debugf("AuthCheck query params: %+v", r.URL.Query())
+// AuthCheckNginx implements nginx auth_request protocol
+func (h *Handlers) AuthCheckNginx(w http.ResponseWriter, r *http.Request) {
+	logrus.Debugf("Nginx AuthCheck request from %s", r.RemoteAddr)
+	logrus.Debugf("Nginx AuthCheck headers: %+v", r.Header)
+	logrus.Debugf("Nginx AuthCheck cookies: %+v", r.Cookies())
 
 	session, err := h.store.Get(r, "auth-session")
 	if err != nil {
 		logrus.Errorf("Failed to get auth session: %v", err)
-		h.handleUnauthenticated(w, r)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	authenticated, ok := session.Values["authenticated"].(bool)
 	logrus.Debugf("Session authenticated: %v, ok: %v", authenticated, ok)
-	logrus.Debugf("Session values: %+v", session.Values)
 
 	if !ok || !authenticated {
-		logrus.Debugf("User not authenticated")
-		h.handleUnauthenticated(w, r)
+		logrus.Debugf("User not authenticated, returning 401 for Nginx")
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// Optional: Add user info to response headers
+	// Add user info to response headers for nginx
 	if userID, ok := session.Values["user_id"].(int); ok {
 		w.Header().Set("X-Auth-User-ID", strconv.Itoa(userID))
 	}
@@ -425,43 +422,107 @@ func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Auth-User", userEmail)
 	}
 
-	logrus.Debugf("User authenticated, returning 200")
+	logrus.Debugf("User authenticated, returning 200 for Nginx")
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleUnauthenticated handles unauthenticated requests for both Nginx and Traefik
-func (h *Handlers) handleUnauthenticated(w http.ResponseWriter, r *http.Request) {
-	// Check for redirect parameter (Traefik ForwardAuth typically includes this)
-	redirectURL := r.URL.Query().Get("rd")
-	if redirectURL == "" {
-		// Also check for other common redirect parameter names
-		redirectURL = r.URL.Query().Get("redirect")
-	}
+// AuthCheckTraefik implements Traefik ForwardAuth protocol
+func (h *Handlers) AuthCheckTraefik(w http.ResponseWriter, r *http.Request) {
+	logrus.Debugf("Traefik AuthCheck request from %s", r.RemoteAddr)
+	logrus.Debugf("Traefik AuthCheck headers: %+v", r.Header)
+	logrus.Debugf("Traefik AuthCheck cookies: %+v", r.Cookies())
 
-	// If redirect parameter is present, return 302 redirect (Traefik ForwardAuth)
-	if redirectURL != "" {
-		logrus.Debugf("Redirect parameter found (%s), returning 302 redirect for Traefik", redirectURL)
-
-		// Construct login URL with redirect parameter
-		loginURL := "/login.html?redirect=" + redirectURL
-
-		// If we have a host header, construct a full URL
-		if host := r.Header.Get("Host"); host != "" {
-			scheme := "http"
-			if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
-				scheme = "https"
-			}
-			loginURL = scheme + "://" + host + loginURL
-		}
-
-		w.Header().Set("Location", loginURL)
-		w.WriteHeader(http.StatusFound) // 302
+	session, err := h.store.Get(r, "auth-session")
+	if err != nil {
+		logrus.Errorf("Failed to get auth session: %v", err)
+		h.handleTraefikUnauthenticated(w, r)
 		return
 	}
 
-	// No redirect parameter, return 401 (Nginx auth_request)
-	logrus.Debugf("No redirect parameter, returning 401 for Nginx auth_request")
-	w.WriteHeader(http.StatusUnauthorized)
+	authenticated, ok := session.Values["authenticated"].(bool)
+	logrus.Debugf("Session authenticated: %v, ok: %v", authenticated, ok)
+
+	if !ok || !authenticated {
+		logrus.Debugf("User not authenticated")
+		h.handleTraefikUnauthenticated(w, r)
+		return
+	}
+
+	// Add user info to response headers for Traefik
+	if userID, ok := session.Values["user_id"].(int); ok {
+		w.Header().Set("X-Auth-User-ID", strconv.Itoa(userID))
+	}
+	if userEmail, ok := session.Values["user_email"].(string); ok {
+		w.Header().Set("X-Auth-User", userEmail)
+	}
+
+	logrus.Debugf("User authenticated, returning 200 for Traefik")
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleTraefikUnauthenticated handles unauthenticated requests for Traefik ForwardAuth
+func (h *Handlers) handleTraefikUnauthenticated(w http.ResponseWriter, r *http.Request) {
+	// Construct the original URL from Traefik headers
+	redirectURL := h.constructOriginalURL(r)
+	
+	logrus.Debugf("Constructed redirect URL from headers: %s", redirectURL)
+
+	// Construct login URL with redirect parameter
+	loginURL := "/login.html"
+	if redirectURL != "" {
+		loginURL += "?redirect=" + redirectURL
+	}
+
+	// If we have a host header, construct a full URL
+	if host := r.Header.Get("Host"); host != "" {
+		scheme := "http"
+		if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
+			scheme = "https"
+		}
+		loginURL = scheme + "://" + host + loginURL
+	}
+
+	logrus.Debugf("Returning 302 redirect to: %s", loginURL)
+	w.Header().Set("Location", loginURL)
+	w.WriteHeader(http.StatusFound) // 302
+}
+
+// constructOriginalURL reconstructs the original URL from Traefik forwarded headers
+func (h *Handlers) constructOriginalURL(r *http.Request) string {
+	// Traefik sets various headers that we can use to reconstruct the original URL
+	
+	// Check for X-Forwarded-Host (original host)
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Header.Get("X-Original-Host")
+	}
+	if host == "" {
+		// Fallback to Host header
+		host = r.Header.Get("Host")
+	}
+
+	// Check for X-Forwarded-Uri (original path + query)
+	uri := r.Header.Get("X-Forwarded-Uri")
+	if uri == "" {
+		uri = r.Header.Get("X-Original-URI")
+	}
+	if uri == "" {
+		// Fallback to request URI
+		uri = r.RequestURI
+	}
+
+	// Determine scheme
+	scheme := "http"
+	if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
+		scheme = "https"
+	}
+
+	if host == "" {
+		return ""
+	}
+
+	// Construct the full URL
+	return scheme + "://" + host + uri
 }
 
 // GetAuthStatus returns the current authentication status

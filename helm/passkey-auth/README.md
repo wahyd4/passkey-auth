@@ -95,9 +95,9 @@ kind: Ingress
 metadata:
   name: my-protected-app
   annotations:
-    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/auth"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/auth/nginx"
     nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/login?rd=$scheme://$http_host$request_uri"
-    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User,X-Auth-Email"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User,X-Auth-User-ID"
 spec:
   # ... your ingress spec
 ```
@@ -114,7 +114,7 @@ metadata:
   namespace: your-app-namespace
 spec:
   forwardAuth:
-    address: https://auth.example.com/auth
+    address: https://auth.example.com/auth/traefik
     authRequestHeaders:
       - "X-Forwarded-Method"
       - "X-Forwarded-Proto"
@@ -123,8 +123,8 @@ spec:
       - "X-Forwarded-For"
     authResponseHeaders:
       - "X-Auth-User"
-      - "X-Auth-Email"
-    authResponseHeadersRegex: "^X-"
+      - "X-Auth-User-ID"
+    authResponseHeadersRegex: "^X-|^Location$"
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

@@ -8,7 +8,7 @@ metadata:
     {{- include "passkey-auth.labels" . | nindent 4 }}
 spec:
   forwardAuth:
-    address: http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/auth
+    address: http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/auth/traefik
     authRequestHeaders:
     - X-Forwarded-Method
     - X-Forwarded-Proto

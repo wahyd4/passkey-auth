@@ -163,18 +163,17 @@ go run main.go
 
 ### Auth Endpoint Behavior
 
-The `/auth` endpoint automatically adapts to work with both Nginx and Traefik ingress controllers:
+The auth service provides separate endpoints for different ingress controllers:
 
-**For Nginx auth_request:**
-- Authenticated users: Returns `200 OK` with user headers
+**Nginx auth_request (`/auth/nginx`):**
+- Authenticated users: Returns `200 OK` with user headers (`X-Auth-User`, `X-Auth-User-ID`)
 - Unauthenticated users: Returns `401 Unauthorized`
 
-**For Traefik ForwardAuth:**
-- Authenticated users: Returns `200 OK` with user headers
-- Unauthenticated users (with redirect param): Returns `302 Found` with `Location` header pointing to login page
-- Unauthenticated users (without redirect param): Returns `401 Unauthorized` (fallback for Nginx)
+**Traefik ForwardAuth (`/auth/traefik`):**
+- Authenticated users: Returns `200 OK` with user headers (`X-Auth-User`, `X-Auth-User-ID`)
+- Unauthenticated users: Returns `302 Found` with `Location` header pointing to login page
 
-The endpoint detects the ingress controller type by checking for query parameters like `rd` or `redirect` that Traefik typically includes.
+The Traefik endpoint automatically reconstructs the original URL from forwarded headers (`X-Forwarded-Host`, `X-Forwarded-Uri`, `X-Forwarded-Proto`) to provide proper redirect functionality.
 
 ### Key API Endpoints
 
@@ -184,11 +183,10 @@ The endpoint detects the ingress controller type by checking for query parameter
 | `/api/register/finish` | POST | Complete passkey registration |
 | `/api/login/begin` | POST | Start passkey authentication |
 | `/api/login/finish` | POST | Complete passkey authentication |
-| `/auth` | GET | Auth check endpoint for ingress controllers |
+| `/auth/nginx` | GET | Auth check endpoint for Nginx auth_request |
+| `/auth/traefik` | GET | Auth check endpoint for Traefik ForwardAuth |
 | `/api/users` | GET/POST | List/create users |
 | `/health` | GET | Health check |
-
-
 ## 📄 License
 
 Apache License 2.0
