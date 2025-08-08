@@ -464,7 +464,7 @@ func (h *Handlers) AuthCheckTraefik(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) handleTraefikUnauthenticated(w http.ResponseWriter, r *http.Request) {
 	// Construct the original URL from Traefik headers
 	redirectURL := h.constructOriginalURL(r)
-	
+
 	logrus.Debugf("Constructed redirect URL from headers: %s", redirectURL)
 
 	// Construct login URL with redirect parameter
@@ -490,7 +490,7 @@ func (h *Handlers) handleTraefikUnauthenticated(w http.ResponseWriter, r *http.R
 // constructOriginalURL reconstructs the original URL from Traefik forwarded headers
 func (h *Handlers) constructOriginalURL(r *http.Request) string {
 	// Traefik sets various headers that we can use to reconstruct the original URL
-	
+
 	// Check for X-Forwarded-Host (original host)
 	host := r.Header.Get("X-Forwarded-Host")
 	if host == "" {
@@ -510,6 +510,8 @@ func (h *Handlers) constructOriginalURL(r *http.Request) string {
 		// Fallback to request URI
 		uri = r.RequestURI
 	}
+
+	logrus.Debugf("request URI: %s, X-Original-URI: %s, X-Forwarded-Uri: %s", r.RequestURI, r.Header.Get("X-Original-URI"), r.Header.Get("X-Forwarded-Uri"))
 
 	// Determine scheme
 	scheme := "http"
