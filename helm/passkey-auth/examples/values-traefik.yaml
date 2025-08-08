@@ -1,0 +1,55 @@
+# Example values for Traefik deployment
+# Copy this file and modify for your environment
+
+config:
+  webauthn:
+    rpId: "auth.example.com"
+    rpOrigins:
+      - "https://auth.example.com"
+
+  cors:
+    allowedOrigins:
+      - "https://*.example.com"
+
+  auth:
+    cookieDomain: ".example.com"
+    allowedEmails:
+      - "admin@example.com"
+
+secrets:
+  sessionSecret: "your-secure-random-secret-min-32-chars"
+
+ingress:
+  enabled: true
+  className: "traefik"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: auth.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: passkey-auth-tls
+      hosts:
+        - auth.example.com
+
+# Enable Traefik middleware creation
+traefik:
+  enabled: true
+  middleware:
+    create: true
+    name: "passkey-auth"  # Optional: custom name
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+resources:
+  limits:
+    cpu: 400m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

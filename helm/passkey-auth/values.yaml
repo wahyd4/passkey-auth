@@ -166,3 +166,10 @@ volumeMounts: []
 
 # Additional volumes
 volumes: []
+
+# Traefik-specific configuration
+traefik:
+  enabled: false
+  middleware:
+    create: true
+    name: ""  # If empty, will use chart fullname

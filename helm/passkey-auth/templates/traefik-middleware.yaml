@@ -1,0 +1,27 @@
+{{- if and .Values.traefik.enabled .Values.traefik.middleware.create }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ default (include "passkey-auth.fullname" .) .Values.traefik.middleware.name }}-forwardauth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "passkey-auth.labels" . | nindent 4 }}
+spec:
+  forwardAuth:
+    address: http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/auth
+    authRequestHeaders:
+    - X-Forwarded-Method
+    - X-Forwarded-Proto
+    - X-Forwarded-Host
+    - X-Forwarded-Uri
+    - X-Forwarded-For
+    - Cookie
+    - Authorization
+    authResponseHeaders:
+    - X-Auth-User
+    - X-Auth-Email
+    authResponseHeadersRegex: "^X-"
+    authResponseHeaders:
+    - Location
+    authResponseHeadersRegex: ^X-|^Location$
+{{- end }}
