@@ -392,18 +392,17 @@ func (h *Handlers) Logout(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, map[string]string{"status": "success"})
 }
 
-// AuthCheck implements auth backend for both nginx auth_request and Traefik ForwardAuth
+// AuthCheck implements the nginx auth_request protocol
 func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 	// Debug logging
 	logrus.Debugf("AuthCheck request from %s", r.RemoteAddr)
 	logrus.Debugf("AuthCheck headers: %+v", r.Header)
 	logrus.Debugf("AuthCheck cookies: %+v", r.Cookies())
-	logrus.Debugf("AuthCheck query params: %+v", r.URL.Query())
 
 	session, err := h.store.Get(r, "auth-session")
 	if err != nil {
 		logrus.Errorf("Failed to get auth session: %v", err)
-		h.handleUnauthenticated(w, r)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -412,8 +411,8 @@ func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("Session values: %+v", session.Values)
 
 	if !ok || !authenticated {
-		logrus.Debugf("User not authenticated")
-		h.handleUnauthenticated(w, r)
+		logrus.Debugf("User not authenticated, returning 401")
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -427,41 +426,6 @@ func (h *Handlers) AuthCheck(w http.ResponseWriter, r *http.Request) {
 
 	logrus.Debugf("User authenticated, returning 200")
 	w.WriteHeader(http.StatusOK)
-}
-
-// handleUnauthenticated handles unauthenticated requests for both Nginx and Traefik
-func (h *Handlers) handleUnauthenticated(w http.ResponseWriter, r *http.Request) {
-	// Check for redirect parameter (Traefik ForwardAuth typically includes this)
-	redirectURL := r.URL.Query().Get("rd")
-	if redirectURL == "" {
-		// Also check for other common redirect parameter names
-		redirectURL = r.URL.Query().Get("redirect")
-	}
-
-	// If redirect parameter is present, return 302 redirect (Traefik ForwardAuth)
-	if redirectURL != "" {
-		logrus.Debugf("Redirect parameter found (%s), returning 302 redirect for Traefik", redirectURL)
-
-		// Construct login URL with redirect parameter
-		loginURL := "/login.html?redirect=" + redirectURL
-
-		// If we have a host header, construct a full URL
-		if host := r.Header.Get("Host"); host != "" {
-			scheme := "http"
-			if r.Header.Get("X-Forwarded-Proto") == "https" || r.TLS != nil {
-				scheme = "https"
-			}
-			loginURL = scheme + "://" + host + loginURL
-		}
-
-		w.Header().Set("Location", loginURL)
-		w.WriteHeader(http.StatusFound) // 302
-		return
-	}
-
-	// No redirect parameter, return 401 (Nginx auth_request)
-	logrus.Debugf("No redirect parameter, returning 401 for Nginx auth_request")
-	w.WriteHeader(http.StatusUnauthorized)
 }
 
 // GetAuthStatus returns the current authentication status

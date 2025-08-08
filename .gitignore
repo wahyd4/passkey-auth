@@ -59,4 +59,3 @@ dev-*
 web/test.html
 
 *.log
-test*.yaml

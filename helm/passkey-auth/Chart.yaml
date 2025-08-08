@@ -1,8 +1,8 @@
 apiVersion: v2
 name: passkey-auth
-description: A WebAuthn-based passkey authentication provider for Kubernetes ingress controllers (Nginx & Traefik)
+description: A WebAuthn-based passkey authentication provider for Kubernetes Nginx Ingress
 type: application
-version: 0.1.2
+version: 0.1.1
 appVersion: "main"
 home: https://github.com/wahyd4/passkey-auth
 sources:
@@ -15,7 +15,6 @@ keywords:
   - webauthn
   - passkey
   - nginx-ingress
-  - traefik-ingress
   - security
 annotations:
   category: Security
