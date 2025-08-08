@@ -1,6 +1,6 @@
 # Passkey Auth Helm Chart
 
-A Helm chart for deploying Passkey Auth, a WebAuthn-based passkey authentication provider that integrates with Kubernetes Nginx Ingress controller.
+A Helm chart for deploying Passkey Auth, a WebAuthn-based passkey authentication provider that integrates with Kubernetes ingress controllers (Nginx Ingress Controller and Traefik Ingress Controller).
 
 ## Overview
 
@@ -18,7 +18,7 @@ helm upgrade --install my-passkey-auth -n home-apps -f my-values.yaml  passkey-a
 
 - Kubernetes 1.19+
 - Helm 3.0+
-- Nginx Ingress Controller
+- Ingress Controller (Nginx Ingress Controller or Traefik Ingress Controller)
 - StorageClass for persistent volumes
 
 ## Installation
@@ -85,6 +85,8 @@ ingress:
 
 ## Setup Authentication for Your Services
 
+### Nginx Ingress Controller
+
 Add these annotations to your ingress resources to protect them with passkey authentication:
 
 ```yaml
@@ -96,6 +98,40 @@ metadata:
     nginx.ingress.kubernetes.io/auth-url: "https://auth.example.com/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com/login?rd=$scheme://$http_host$request_uri"
     nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User,X-Auth-Email"
+spec:
+  # ... your ingress spec
+```
+
+### Traefik Ingress Controller
+
+For Traefik, create a ForwardAuth middleware and reference it in your ingress:
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: passkey-auth
+  namespace: your-app-namespace
+spec:
+  forwardAuth:
+    address: https://auth.example.com/auth
+    authRequestHeaders:
+      - "X-Forwarded-Method"
+      - "X-Forwarded-Proto"
+      - "X-Forwarded-Host"
+      - "X-Forwarded-Uri"
+      - "X-Forwarded-For"
+    authResponseHeaders:
+      - "X-Auth-User"
+      - "X-Auth-Email"
+    authResponseHeadersRegex: "^X-"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-protected-app
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: your-app-namespace-passkey-auth@kubernetescrd
 spec:
   # ... your ingress spec
 ```
@@ -256,3 +292,11 @@ secrets:
 | `nodeSelector` | Node labels for pod assignment                                 | `{}`    |
 | `tolerations`  | Tolerations for pod assignment                                 | `[]`    |
 | `affinity`     | Affinity for pod assignment                                    | `{}`    |
+
+### Traefik configuration
+
+| Name                           | Description                                                     | Value   |
+| ------------------------------ | --------------------------------------------------------------- | ------- |
+| `traefik.enabled`              | Enable Traefik-specific features                              | `false` |
+| `traefik.middleware.create`    | Create Traefik ForwardAuth middleware                         | `true`  |
+| `traefik.middleware.name`      | Custom name for middleware (defaults to chart fullname)       | `""`    |

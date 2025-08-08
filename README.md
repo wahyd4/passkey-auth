@@ -1,6 +1,6 @@
-# 🔐 Passkey Auth for Kubernetes Nginx Ingress
+# 🔐 Passkey Auth for Kubernetes Ingress Controllers
 
-A WebAuthn-based passkey authentication provider that integrates ingress controllers, currently support Kubernetes nginx Ingress controller. Provides secure, passwordless authentication using passkeys (FIDO2/WebAuthn) as an auth backend for nginx ingress.
+A WebAuthn-based passkey authentication provider that integrates with ingress controllers. Currently supports Kubernetes Nginx Ingress Controller and Traefik Ingress Controller. Provides secure, passwordless authentication using passkeys (FIDO2/WebAuthn) as an auth backend.
 
 ## TLDR;
 
@@ -17,7 +17,7 @@ I use it for signing into my home lab apps.
 ## ✨ Features
 
 - **Passwordless Authentication**: Uses WebAuthn/FIDO2 passkeys for secure authentication
-- **Nginx Ingress Integration**: Works as auth backend using nginx `auth_request` directive
+- **Ingress Controller Integration**: Works as auth backend for Nginx Ingress (`auth_request`) and Traefik Ingress (`ForwardAuth`)
 - **User Management**: An simple Admin interface for managing users and approval status
 - **Kubernetes Native**: Designed for Kubernetes deployment with persistent storage
 
@@ -63,15 +63,17 @@ go run main.go
 
 ### Setup Your App's Ingress
 
+#### Nginx Ingress Controller
+
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: your-app-ingress
   annotations:
-
     nginx.ingress.kubernetes.io/auth-url: "https://your-passkey-auth.com/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://your-passkey-auth.com/?redirect=https%3A%2F%2F$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-User,X-Auth-Email"
 spec:
   rules:
   - host: your-app.com
@@ -84,6 +86,47 @@ spec:
             name: your-app-service
             port:
               number: 80
+```
+
+#### Traefik Ingress Controller
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: your-app-ingress
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: default-passkey-auth@kubernetescrd
+spec:
+  rules:
+  - host: your-app.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: your-app-service
+            port:
+              number: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: passkey-auth
+spec:
+  forwardAuth:
+    address: https://your-passkey-auth.com/auth
+    authRequestHeaders:
+      - "X-Forwarded-Method"
+      - "X-Forwarded-Proto"
+      - "X-Forwarded-Host"
+      - "X-Forwarded-Uri"
+      - "X-Forwarded-For"
+    authResponseHeaders:
+      - "X-Auth-User"
+      - "X-Auth-Email"
+    authResponseHeadersRegex: "^X-"
 ```
 
 
@@ -118,6 +161,21 @@ go run main.go
 # Access at http://localhost:8080
 ```
 
+### Auth Endpoint Behavior
+
+The `/auth` endpoint automatically adapts to work with both Nginx and Traefik ingress controllers:
+
+**For Nginx auth_request:**
+- Authenticated users: Returns `200 OK` with user headers
+- Unauthenticated users: Returns `401 Unauthorized`
+
+**For Traefik ForwardAuth:**
+- Authenticated users: Returns `200 OK` with user headers
+- Unauthenticated users (with redirect param): Returns `302 Found` with `Location` header pointing to login page
+- Unauthenticated users (without redirect param): Returns `401 Unauthorized` (fallback for Nginx)
+
+The endpoint detects the ingress controller type by checking for query parameters like `rd` or `redirect` that Traefik typically includes.
+
 ### Key API Endpoints
 
 | Endpoint | Method | Description |
@@ -126,7 +184,7 @@ go run main.go
 | `/api/register/finish` | POST | Complete passkey registration |
 | `/api/login/begin` | POST | Start passkey authentication |
 | `/api/login/finish` | POST | Complete passkey authentication |
-| `/auth` | GET | Nginx auth check endpoint |
+| `/auth` | GET | Auth check endpoint for ingress controllers |
 | `/api/users` | GET/POST | List/create users |
 | `/health` | GET | Health check |
 

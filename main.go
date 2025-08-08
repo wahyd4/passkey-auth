@@ -61,7 +61,9 @@ func main() {
 	api.HandleFunc("/users/{id}", h.UpdateUser).Methods("PUT")
 	api.HandleFunc("/users/{id}", h.DeleteUser).Methods("DELETE")
 
-	// Nginx auth backend endpoint
+	// Auth backend endpoint for ingress controllers (Nginx auth_request & Traefik ForwardAuth)
+	// - For Nginx: Returns 200 for authenticated, 401 for unauthenticated
+	// - For Traefik: Returns 200 for authenticated, 302 redirect for unauthenticated (when rd param present)
 	router.HandleFunc("/auth", h.AuthCheck).Methods("GET", "HEAD")
 
 	// Health check
