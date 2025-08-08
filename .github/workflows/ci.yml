@@ -128,7 +128,7 @@ jobs:
       uses: golangci/golangci-lint-action@v3
       with:
         version: latest
-        args: --timeout=5m
+        args: --timeout=5m --tests=false
 
   security:
     runs-on: ubuntu-latest

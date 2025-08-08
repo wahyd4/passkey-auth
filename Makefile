@@ -37,18 +37,6 @@ docker-run: docker-build ## Run with Docker Compose
 	@docker-compose up -d
 	@echo "Access the application at http://localhost:8080"
 
-docker-stop: ## Stop Docker Compose
-	@echo "🛑 Stopping Docker Compose..."
-	@docker-compose down
-
-k8s-deploy: docker-build ## Deploy to Kubernetes
-	@echo "☸️  Deploying to Kubernetes..."
-	@./scripts/deploy.sh
-
-k8s-undeploy: ## Remove from Kubernetes
-	@echo "☸️  Removing from Kubernetes..."
-	@./scripts/undeploy.sh
-
 deps: ## Download dependencies
 	@echo "📦 Downloading dependencies..."
 	@go mod download
