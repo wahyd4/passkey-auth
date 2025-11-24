@@ -1,4 +1,6 @@
-# 🔐 Passkey Auth for Kubernetes Nginx Ingress
+# This Project has been deprecated, Please consider using [Pocket-id](https://github.com/pocket-id/pocket-id) for better user experience
+
+~~# 🔐 Passkey Auth for Kubernetes Nginx Ingress~~
 
 A WebAuthn-based passkey authentication provider that integrates ingress controllers, currently support Kubernetes nginx Ingress controller. Provides secure, passwordless authentication using passkeys (FIDO2/WebAuthn) as an auth backend for nginx ingress.
 
